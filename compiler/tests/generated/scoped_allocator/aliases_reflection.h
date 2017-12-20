@@ -23,18 +23,27 @@ namespace tests
             // aa
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 Foo<T>,
                 std::vector<std::vector<T, std::scoped_allocator_adaptor<typename std::allocator_traits<arena>::template rebind_alloc<T> > >, std::scoped_allocator_adaptor<typename std::allocator_traits<arena>::template rebind_alloc<std::vector<T, std::scoped_allocator_adaptor<typename std::allocator_traits<arena>::template rebind_alloc<T> > > > > >,
                 &Foo<T>::aa,
                 &s_aa_metadata
-            > {}  aa;
+            > {} aa;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef typename boost::mpl::push_front<fields0, typename var::aa>::type fields1;
+        using field_count = std::integral_constant<uint16_t, 1>;
 
-        public: typedef typename fields1::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<typename var::aa> {};
+        
         
         Schema()
         {
@@ -45,7 +54,7 @@ namespace tests
         
         static ::bond::Metadata GetMetadata()
         {
-            return ::bond::reflection::MetadataInit<boost::mpl::list<T> >("Foo", "tests.Foo",
+            return ::bond::reflection::MetadataInit<::bond::detail::mpl::list<T> >("Foo", "tests.Foo",
                 ::bond::reflection::Attributes()
             );
         }
@@ -75,18 +84,26 @@ namespace tests
             // aWrappedEnum
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 WrappingAnEnum,
                 ::tests::EnumToWrap,
                 &WrappingAnEnum::aWrappedEnum,
                 &s_aWrappedEnum_metadata
-            > {}  aWrappedEnum;
+            > {} aWrappedEnum;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::aWrappedEnum>::type fields1;
+        using field_count = std::integral_constant<uint16_t, 1>;
 
-        public: typedef fields1::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::aWrappedEnum> {};
         
         
         static ::bond::Metadata GetMetadata()

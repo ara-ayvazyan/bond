@@ -49,10 +49,23 @@ template <typename T, typename Enable = void> struct
 schema;
 
 template <typename T> struct
-schema<T, typename boost::enable_if<std::is_class<typename T::Schema::fields> >::type>
+schema<T, typename boost::enable_if<std::is_class<typename T::Schema::var> >::type>
 {
     typedef typename T::Schema type;
 };
+
+
+// is_schema
+template <typename T, typename Enable = void> struct
+is_schema
+    : std::false_type {};
+
+template <typename T> struct
+is_schema<T, typename boost::enable_if_c<
+        std::is_class<typename T::base>::value
+        && std::is_class<typename T::var>::value
+        && std::is_class<typename T::field_count>::value>::type>
+    : std::true_type {};
 
 
 // has_schema
@@ -62,7 +75,7 @@ has_schema
 
 
 template <typename T> struct
-has_schema<T, typename boost::enable_if<std::is_class<typename schema<T>::type> >::type>
+has_schema<T, typename boost::enable_if<is_schema<typename schema<T>::type> >::type>
     : std::true_type {};
 
 

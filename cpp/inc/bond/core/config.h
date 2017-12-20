@@ -34,6 +34,11 @@
 #define BOND_NO_CXX14_GENERIC_LAMBDAS
 #endif
 
+#if (defined(_MSC_VER) && (_MSC_VER <= 1800)) \
+    || !(defined(__cpp_lib_integer_sequence) && (__cpp_lib_integer_sequence >= 201304))
+#define BOND_NO_CXX14_INTEGER_SEQUENCE
+#endif
+
 #ifdef _MSC_VER
 #define BOND_CALL       __cdecl
 #define BOND_NO_INLINE  __declspec(noinline)

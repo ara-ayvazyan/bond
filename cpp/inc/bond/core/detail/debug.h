@@ -13,43 +13,41 @@ namespace bond
 namespace detail
 {
 
-template <typename T>
-class OptionalDefault : boost::noncopyable
+template <typename Field> struct
+is_optional
+    : std::integral_constant<bool,
+        !is_bond_type<typename Field::field_type>::value
+        && std::is_same<typename Field::field_modifier, reflection::optional_field_modifier>::value> {};
+
+
+template <typename Field, typename T>
+inline typename boost::enable_if<is_optional<Field>, bool>::type
+IsOptionalDefault(const T& var)
 {
-public:
-    OptionalDefault(const T& var)
-        : _var(var),
-          _default(true)
-    {
-        boost::mpl::for_each<typename schema<T>::type::fields>(boost::ref(*this));
-    }
+    return is_default(Field::GetVariable(var), Field::metadata);
+}
 
-    operator bool()
-    {
-        return _default;
-    }
-
-    template <typename Field>
-    typename boost::enable_if_c<!is_bond_type<typename Field::field_type>::value
-                             && std::is_same<typename Field::field_modifier,
-                                        reflection::optional_field_modifier>::value>::type
-    operator()(const Field&)
-    {
-        _default = _default && is_default(Field::GetVariable(_var), Field::metadata);
-    }
+template <typename Field, typename T>
+inline typename boost::disable_if<is_optional<Field>, bool>::type
+IsOptionalDefault(const T& /*var*/)
+{
+    return true;
+}
 
 
-    template <typename Field>
-    typename boost::disable_if_c<!is_bond_type<typename Field::field_type>::value
-                              && std::is_same<typename Field::field_modifier,
-                                         reflection::optional_field_modifier>::value>::type
-    operator()(const Field&)
-    {}
+template <typename T, uint16_t I = 0>
+inline typename boost::enable_if_c<(I == schema<T>::type::field_count::value), bool>::type
+CheckOptionalDefault(const T& /*var*/)
+{
+    return true;
+}
 
-private:
-    const T& _var;
-    bool     _default;
-};
+template <typename T, uint16_t I = 0>
+inline typename boost::disable_if_c<(I == schema<T>::type::field_count::value), bool>::type
+CheckOptionalDefault(const T& var)
+{
+    return IsOptionalDefault<field_info<T, I> >(var) && CheckOptionalDefault<T, I + 1>(var);
+}
 
 
 } // namespace detail

@@ -385,8 +385,10 @@ public:
         : _name(name)
     {}
 
+    TypeListBuilder& operator=(const TypeListBuilder&) = delete;
+
     template <typename T>
-    void operator()(const T*)
+    void operator()(const mpl::identity<T>&)
     {
         if (!_name.empty())
             _name += ", ";
@@ -395,8 +397,6 @@ public:
     }
 
 private:
-    TypeListBuilder& operator=(const TypeListBuilder&);
-
     std::string& _name;
 };
 

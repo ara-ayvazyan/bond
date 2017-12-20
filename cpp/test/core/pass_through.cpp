@@ -310,31 +310,18 @@ namespace bond
         // Supress assert on optional fields being set to default values
         // for OptionalContainers and StructWithDefaults used in
         // DefaultValuesTranscoding test case.
-        template <>
-        class OptionalDefault<OptionalContainers>
-        {
-        public:
-            OptionalDefault(const OptionalContainers&)
-            {}
-
-            operator bool()
-            {
-                return true;
-            }
-        };
 
         template <>
-        class OptionalDefault<StructWithDefaults>
+        bool CheckOptionalDefault<OptionalContainers, 0>(const OptionalContainers&)
         {
-        public:
-            OptionalDefault(const StructWithDefaults&)
-            {}
+            return true;
+        }
 
-            operator bool()
-            {
-                return true;
-            }
-        };
+        template <>
+        bool CheckOptionalDefault<StructWithDefaults, 0>(const StructWithDefaults&)
+        {
+            return true;
+        }
     }
 }
 

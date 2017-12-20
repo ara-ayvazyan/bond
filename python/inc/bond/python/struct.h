@@ -236,7 +236,20 @@ class schema_fields_visitor
     template <class classT>
     void visit(classT& c) const
     {
-        boost::mpl::for_each<typename T::Schema::fields>(def_readwrite_property<classT>(c));
+        visit_fields(def_readwrite_property<classT>(c));
+    }
+
+    template <std::size_t I = 0, class classT>
+    typename boost::enable_if_c<(I == T::Schema::field_count::value)>::type
+    visit_fields(const def_readwrite_property<classT>& /*f*/) const
+    {}
+
+    template <std::size_t I = 0, class classT>
+    typename boost::disable_if_c<(I == T::Schema::field_count::value)>::type
+    visit_fields(const def_readwrite_property<classT>& f) const
+    {
+        f(bond::detail::field_info<T, I>{});
+        visit_fields<I + 1>(f);
     }
 };
 

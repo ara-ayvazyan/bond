@@ -18,6 +18,10 @@
 
 #include <boost/static_assert.hpp>
 
+#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
+#include <functional>
+#endif
+
 namespace bond
 {
 
@@ -385,42 +389,37 @@ class RequiredFieldValiadator
 protected:
     void Begin() const
     {
-        _required = next_required_field<typename schema<T>::type::fields>::value;
+        _required = next_required_field<typename schema<T>::type>::value;
     }
 
-    template <typename Head>
-    typename boost::enable_if<std::is_same<typename Head::field_modifier,
-                                           reflection::required_field_modifier> >::type
+
+    template <typename Field>
+    typename boost::enable_if<std::is_same<typename Field::field_modifier, reflection::required_field_modifier> >::type
     Validate() const
     {
-        if (_required == Head::id)
-            _required = next_required_field<typename schema<T>::type::fields, Head::id + 1>::value;
+        if (_required == Field::id)
+            _required = next_required_field<typename schema<T>::type, Field::index + 1>::value;
         else
             MissingFieldException();
     }
 
-
-    template <typename Schema>
-    typename boost::enable_if_c<next_required_field<typename Schema::fields>::value
-                             != invalid_field_id>::type
+    template <typename Field>
+    typename boost::disable_if<std::is_same<typename Field::field_modifier, reflection::required_field_modifier> >::type
     Validate() const
+    {}
+
+
+    template <typename U = T>
+    typename boost::enable_if_c<next_required_field<typename schema<U>::type>::value != invalid_field_id>::type
+    End() const
     {
         if (_required != invalid_field_id)
             MissingFieldException();
     }
 
-
-    template <typename Head>
-    typename boost::disable_if<std::is_same<typename Head::field_modifier,
-                                            reflection::required_field_modifier> >::type
-    Validate() const
-    {}
-
-
-    template <typename Schema>
-    typename boost::disable_if_c<next_required_field<typename Schema::fields>::value
-                              != invalid_field_id>::type
-    Validate() const
+    template <typename U = T>
+    typename boost::disable_if_c<next_required_field<typename schema<U>::type>::value != invalid_field_id>::type
+    End() const
     {}
 
 private:
@@ -471,12 +470,6 @@ protected:
     {
         AssignToVar<Protocols>(var.set_value(), value);
     }
-
-    template <typename X>
-    bool AssignToField(const boost::mpl::l_iter<boost::mpl::l_end>&, uint16_t /*id*/, const X& /*value*/) const
-    {
-        return false;
-    }
 };
 
 } // namespace detail
@@ -504,7 +497,7 @@ public:
         // it to default value first.
         //
         // This should only be disabled for unit tests.
-        BOOST_ASSERT(detail::OptionalDefault<T>(_var));
+        BOOST_ASSERT(detail::CheckOptionalDefault(_var));
 #endif
 
         Validator::Begin();
@@ -512,7 +505,7 @@ public:
 
     void End() const
     {
-        Validator::template Validate<typename schema<T>::type>();
+        Validator::End();
     }
 
     template <typename X>
@@ -523,26 +516,49 @@ public:
 
 
     // Separate Field overloads for bonded<T>, basic types and containers allows us to use
-    // simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code but
-    // compiles significantly faster.
+    // simpler predicates. This doesn't matter for runtime code but compiles significantly faster.
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename nested_fields<T>::type>::type(), id, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
+#else
+            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<T, nested_fields<T>::template type>(id, visitor);
+        return false;
     }
 
 
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename matching_fields<T, X>::type>::type(), id, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
+#else
+            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<T, matching_fields<T, X>::template type>(id, visitor);
+        return false;
     }
 
 
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename container_fields<T>::type>::type(), id, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
+#else
+            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<T, container_fields<T>::template type>(id, visitor);
+        return false;
     }
 
 
@@ -553,14 +569,12 @@ public:
     template <typename FieldT, typename X>
     bool Field(const FieldT&, const X& value) const
     {
-        Validator::template Validate<FieldT>();
-        AssignToVar<Protocols>(FieldT::GetVariable(_var), value);
+        AssignToField<FieldT>(value);
         return false;
     }
 
 private:
     using detail::To::AssignToVar;
-    using detail::To::AssignToField;
 
     template <typename X, typename U = T>
     typename boost::enable_if<has_base<U>, bool>::type
@@ -583,20 +597,23 @@ private:
         return false;
     }
 
-    template <typename Fields, typename X>
-    bool AssignToField(const Fields&, uint16_t id, const X& value) const
+    template <typename FieldT, typename X>
+    void AssignToField(const X& value) const
     {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        if (id == Head::id)
-        {
-            return Field(Head(), value);
-        }
-        else
-        {
-            return AssignToField(typename boost::mpl::next<Fields>::type(), id, value);
-        }
+        Validator::template Validate<FieldT>();
+        AssignToVar<Protocols>(FieldT::GetVariable(_var), value);
     }
+
+#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
+    struct AssignToFieldFunctor
+    {
+        template <typename X, typename FieldT>
+        void operator()(const To& transform, const X& value, const detail::mpl::identity<FieldT>&) const
+        {
+            transform.AssignToField<FieldT>(value);
+        }
+    };
+#endif
 
     BOND_NORETURN void UnexpectedStructStopException() const
     {
@@ -690,11 +707,25 @@ protected:
             return AssignToNested<Protocols>(var, ids, value);
     }
 
+    template <typename Protocols, typename FieldT, typename V, typename X>
+    bool Assign(V& var, const PathView& ids, const X& value) const
+    {
+        return Assign<Protocols>(FieldT::GetVariable(var), PathView(ids.path, ids.current + 1), value);
+    }
+
 
     template <typename Protocols, typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return AssignToNested<Protocols>(typename boost::mpl::begin<typename struct_fields<V>::type>::type(), var, ids, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; Assign<Protocols, typename std::decay<decltype(identity)>::type::type>(var, ids, value); };
+#else
+            std::bind(AssignFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(ids), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<V, struct_fields<V>::template type>(*ids.current, visitor);
+        return false;
     }
 
 
@@ -711,69 +742,50 @@ protected:
         return false;
     }
 
-
-    template <typename Protocols, typename Nested, typename V, typename X>
-    bool AssignToNested(const Nested&, V& var, const PathView& ids, const X& value) const
-    {
-        typedef typename boost::mpl::deref<Nested>::type Head;
-
-        if (*ids.current == Head::id)
-            return Assign<Protocols>(Head::GetVariable(var), PathView(ids.path, ids.current + 1), value);
-        else
-            return AssignToNested<Protocols>(typename boost::mpl::next<Nested>::type(), var, ids, value);
-    }
-
-    template <typename Protocols, typename V, typename X>
-    bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
-    {
-        return false;
-    }
-
-
-    // Separate AssignToField overloads for bonded<T>, basic types and containers allows us
-    // to use simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code
-    // but compiles significantly faster.
+    
+    // Separate AssignToField overloads for bonded<T>, basic types and containers allows us 
+    // to use simpler predicates. This doesn't matter for runtime code but compiles significantly faster.
     template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return AssignToField<Protocols>(typename boost::mpl::begin<typename nested_fields<V>::type>::type(), var, id, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
+#else
+            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<V, nested_fields<V>::template type>(id, visitor);
+        return false;
     }
 
 
     template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return AssignToField<Protocols>(typename boost::mpl::begin<typename matching_fields<V, X>::type>::type(), var, id, value);
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
+#else
+            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
+#endif
+
+        detail::search_field<V, matching_fields<V, X>::template type>(id, visitor);
+        return false;
     }
 
 
     template <typename Protocols, typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return AssignToField<Protocols>(typename boost::mpl::begin<typename container_fields<V>::type>::type(), var, id, value);
-    }
+        auto visitor =
+#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
+            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
+#else
+            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
+#endif
 
-
-    template <typename Protocols, typename Fields, typename V, typename X>
-    bool AssignToField(const Fields&, V& var, uint16_t id, const X& value) const
-    {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        if (id == Head::id)
-        {
-            AssignToVar<Protocols>(Head::GetVariable(var), value);
-            return false;
-        }
-        else
-        {
-            return AssignToField<Protocols>(typename boost::mpl::next<Fields>::type(), var, id, value);
-        }
-    }
-
-
-    template <typename Protocols, typename V, typename X>
-    bool AssignToField(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, uint16_t /*id*/, const X& /*value*/) const
-    {
+        detail::search_field<V, container_fields<V>::template type>(id, visitor);
         return false;
     }
 
@@ -790,6 +802,35 @@ protected:
     {
         AssignToVar<Protocols>(var.set_value(), value);
     }
+
+    template <typename Protocols, typename FieldT, typename V, typename X>
+    void AssignToVar(V& var, const X& value) const
+    {
+        AssignToVar<Protocols>(FieldT::GetVariable(var), value);
+    }
+
+private:
+#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
+    template <typename Protocols>
+    struct AssignFunctor
+    {
+        template <typename V, typename X, typename FieldT>
+        void operator()(const MapTo& transform, V& var, const PathView& ids, const X& value, const mpl::identity<FieldT>&) const
+        {
+            transform.Assign<Protocols, FieldT>(var, ids, value);
+        }
+    };
+
+    template <typename Protocols>
+    struct AssignToVarFunctor
+    {
+        template <typename V, typename X, typename FieldT>
+        void operator()(const MapTo& transform, V& var, const X& value, const mpl::identity<FieldT>&) const
+        {
+            transform.AssignToVar<Protocols, FieldT>(var, value);
+        }
+    };
+#endif
 };
 
 } // namespace detail

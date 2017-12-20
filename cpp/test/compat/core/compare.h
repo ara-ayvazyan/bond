@@ -4,8 +4,18 @@
 #include <complex>
 #include <limits>
 
-template <typename T>
-class Compare;
+
+template <std::size_t I = 0, typename T>
+typename boost::enable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& /*left*/, const T& /*right*/)
+{
+    return true;
+}
+
+template <std::size_t I = 0, typename T>
+typename boost::disable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& left, const T& right);
+
 
 inline bool Equal(double left, double right)
 {
@@ -31,9 +41,7 @@ template <typename T>
 typename boost::enable_if<bond::has_schema<T>, bool>::type
 Equal(const T& left, const T& right)
 {
-    bool equal = true;
-    boost::mpl::for_each<typename T::Schema::fields>(Compare<T>(left, right, equal));
-    return equal;
+    return CompareFields(left, right);
 }
 
 
@@ -75,26 +83,12 @@ bool Equal(const std::pair<T1, T2>& left, const std::pair<T1, T2>& right)
 }
 
 
-template <typename T>
-class Compare
+template <std::size_t I, typename T>
+typename boost::disable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& left, const T& right)
 {
-public:
-    Compare(const T& left, const T& right, bool& equal)
-        : left(left),
-          right(right),
-          equal(equal)
-    {}
+    using Field = bond::detail::field_info<T, I>;
 
-    template <typename Field>
-    void operator()(const Field&)
-    {
-        equal = equal && Equal(Field::GetVariable(left), Field::GetVariable(right));
-    }
-
-private:
-    Compare& operator=(const Compare&);
-
-    const T& left;
-    const T& right;
-    bool&    equal;
-};
+    return Equal(Field::GetVariable(left), Field::GetVariable(right))
+        && CompareFields<I + 1>(left, right);
+}

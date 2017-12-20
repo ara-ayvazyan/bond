@@ -25,29 +25,38 @@ namespace bondmeta
             // full_name
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::required_optional_field_modifier,
                 HasMetaFields,
                 std::basic_string<char, std::char_traits<char>, std::scoped_allocator_adaptor<typename std::allocator_traits<arena>::template rebind_alloc<char> > >,
                 &HasMetaFields::full_name,
                 &s_full_name_metadata
-            > {}  full_name;
+            > {} full_name;
         
             // name
             typedef struct : ::bond::reflection::FieldTemplate<
+                1,
                 1,
                 ::bond::reflection::required_optional_field_modifier,
                 HasMetaFields,
                 std::basic_string<char, std::char_traits<char>, std::scoped_allocator_adaptor<typename std::allocator_traits<arena>::template rebind_alloc<char> > >,
                 &HasMetaFields::name,
                 &s_name_metadata
-            > {}  name;
+            > {} name;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::name>::type fields1;
-        private: typedef boost::mpl::push_front<fields1, var::full_name>::type fields2;
+        using field_count = std::integral_constant<uint16_t, 2>;
 
-        public: typedef fields2::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::full_name> {};
+        template <int __bond_dummy> struct field<1, __bond_dummy> : ::bond::detail::mpl::identity<var::name> {};
         
         
         static ::bond::Metadata GetMetadata()

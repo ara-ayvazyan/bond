@@ -112,7 +112,7 @@ namespace tests
     
     template <typename Payload>
     const ::bond::Metadata Foo<Payload>::Schema::metadata
-        = ::bond::reflection::MetadataInit<boost::mpl::list<Payload> >("Foo", "tests.Foo",
+        = ::bond::reflection::MetadataInit<::bond::detail::mpl::list<Payload> >("Foo", "tests.Foo",
                 ::bond::reflection::Attributes());
     
     template <typename Payload>

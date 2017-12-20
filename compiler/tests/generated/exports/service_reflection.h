@@ -26,18 +26,26 @@ namespace tests
             // count
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 dummy,
                 int32_t,
                 &dummy::count,
                 &s_count_metadata
-            > {}  count;
+            > {} count;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::count>::type fields1;
+        using field_count = std::integral_constant<uint16_t, 1>;
 
-        public: typedef fields1::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::count> {};
         
         
         static ::bond::Metadata GetMetadata()

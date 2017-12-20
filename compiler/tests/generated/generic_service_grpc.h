@@ -16,6 +16,8 @@
 #include <bond/ext/grpc/detail/service.h>
 #include <bond/ext/grpc/detail/service_call_data.h>
 
+#include <boost/mpl/list.hpp>
+#include <boost/mpl/push_front.hpp>
 #include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
@@ -418,7 +420,7 @@ template <typename Payload>
 
     template <typename Payload>
     const ::bond::Metadata Foo<Payload>::Schema::metadata
-        = ::bond::reflection::MetadataInit<boost::mpl::list<Payload> >("Foo", "tests.Foo",
+        = ::bond::reflection::MetadataInit<::bond::detail::mpl::list<Payload> >("Foo", "tests.Foo",
                 ::bond::reflection::Attributes());
     
     template <typename Payload>

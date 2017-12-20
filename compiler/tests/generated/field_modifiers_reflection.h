@@ -24,40 +24,50 @@ namespace tests
             // o
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 Foo,
                 bool,
                 &Foo::o,
                 &s_o_metadata
-            > {}  o;
+            > {} o;
         
             // r
             typedef struct : ::bond::reflection::FieldTemplate<
+                1,
                 1,
                 ::bond::reflection::required_field_modifier,
                 Foo,
                 int16_t,
                 &Foo::r,
                 &s_r_metadata
-            > {}  r;
+            > {} r;
         
             // ro
             typedef struct : ::bond::reflection::FieldTemplate<
+                2,
                 2,
                 ::bond::reflection::required_optional_field_modifier,
                 Foo,
                 double,
                 &Foo::ro,
                 &s_ro_metadata
-            > {}  ro;
+            > {} ro;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::ro>::type fields1;
-        private: typedef boost::mpl::push_front<fields1, var::r>::type fields2;
-        private: typedef boost::mpl::push_front<fields2, var::o>::type fields3;
+        using field_count = std::integral_constant<uint16_t, 3>;
 
-        public: typedef fields3::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::o> {};
+        template <int __bond_dummy> struct field<1, __bond_dummy> : ::bond::detail::mpl::identity<var::r> {};
+        template <int __bond_dummy> struct field<2, __bond_dummy> : ::bond::detail::mpl::identity<var::ro> {};
         
         
         static ::bond::Metadata GetMetadata()

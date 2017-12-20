@@ -87,7 +87,7 @@ protected:
 
         detail::StructEnd(_input, true);
 
-        static_cast<Parser*>(this)->SkipFields(typename boost::mpl::begin<typename T::fields>::type());
+        static_cast<Parser*>(this)->SkipFields(T{});
 
         return result;
     }
@@ -106,7 +106,7 @@ protected:
 
         if (!done)
         {
-            done = static_cast<Parser*>(this)->ReadFields(typename boost::mpl::begin<typename T::fields>::type(), transform);
+            done = static_cast<Parser*>(this)->ReadFields(T{}, transform);
         }
 
         transform.End();

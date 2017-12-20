@@ -48,10 +48,10 @@ template <typename List, typename Visitor, typename Any>
 inline auto visit_any(Visitor&& visitor, Any& x)
 {
     return mpl::try_apply<List>(
-        [&](auto identity)
+        [&](const auto& identity)
         {
             (void)identity;
-            return try_visit_any<typename decltype(identity)::type>(std::forward<Visitor>(visitor), x);
+            return try_visit_any<typename std::decay<decltype(identity)>::type::type>(std::forward<Visitor>(visitor), x);
         });
 }
 
@@ -108,8 +108,21 @@ visitor_result<void>
     using type = bool;
 };
 
+template <typename List>
+struct visit_any_functor;
+
+template <typename... T>
+struct visit_any_functor<mpl::list<T...> >
+{
+    template <typename Result, typename Visitor, typename Any>
+    static typename visitor_result<Result>::type invoke(Visitor&& visitor, Any& x)
+    {
+        return mpl::try_apply<mpl::list<T...> >(try_visit_any<Result, Visitor, Any>(visitor, x));
+    }
+};
+
 template <typename Result, typename Visitor, typename Any, typename T, typename... U>
-inline typename visitor_result<Result>::type visit_any(Visitor&& visitor, Any& x, const mpl::list<T, U...>&)
+inline typename visitor_result<Result>::type visit_any(Visitor&& visitor, Any& x, mpl::list<T, U...>)
 {
     return mpl::try_apply<mpl::list<T, U...> >(try_visit_any<Result, Visitor, Any>(visitor, x));
 }
@@ -117,7 +130,7 @@ inline typename visitor_result<Result>::type visit_any(Visitor&& visitor, Any& x
 template <typename List, typename Result, typename Visitor, typename Any>
 inline typename visitor_result<Result>::type visit_any(Visitor&& visitor, Any& x)
 {
-    return visit_any<Result>(std::forward<Visitor>(visitor), x, List{});
+    return visit_any_functor<List>::template invoke<Result>(std::forward<Visitor>(visitor), x);
 }
 
 #endif

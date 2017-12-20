@@ -89,27 +89,6 @@ template <typename Protocols, typename T1, typename T2>
 typename boost::enable_if<bond::is_container<T1>, bool>::type
 Equal(const T1& lhs, const T2& rhs);
 
-template <typename T, typename Protocols>
-class Comparer
-{
-public:
-    Comparer(const T& left, const T& right, bool& equal)
-        : left(left),
-          right(right),
-          equal(equal)
-    {}
-
-    template <typename Field>
-    void operator()(const Field&);
-
-private:
-    Comparer& operator=(const Comparer&);
-
-    const T& left;
-    const T& right;
-    bool&    equal;
-};
-
 
 template <typename Protocols = bond::BuiltInProtocols, typename T1, typename T2>
 bool Compare(const T1& lhs, const T2& rhs)
@@ -134,13 +113,23 @@ inline bool Equal(const bond::blob& lhs, const bond::blob& rhs)
 }
 
 
+template <typename Protocols, std::size_t I = 0, typename T>
+typename boost::enable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& /*left*/, const T& /*right*/)
+{
+    return true;
+}
+
+template <typename Protocols, std::size_t I = 0, typename T>
+typename boost::disable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& left, const T& right);
+
+
 template <typename Protocols = bond::BuiltInProtocols, typename T>
 typename boost::enable_if<bond::has_schema<T>, bool>::type
 Equal(const T& left, const T& right)
 {
-    bool equal = true;
-    boost::mpl::for_each<typename T::Schema::fields>(Comparer<T, Protocols>(left, right, equal));
-    return equal;
+    return CompareFields<Protocols>(left, right);
 }
 
 // "loose" equality for matching but different types
@@ -327,9 +316,12 @@ bool Compare(const SkipStruct<T>& left, const SkipStruct2<T>& right)
 }
 
 
-template <typename T, typename Protocols>
-template <typename Field>
-void Comparer<T, Protocols>::operator()(const Field&)
+template <typename Protocols, std::size_t I, typename T>
+typename boost::disable_if_c<(I == T::Schema::field_count::value), bool>::type
+CompareFields(const T& left, const T& right)
 {
-    equal = equal && Equal<Protocols>(Field::GetVariable(left), Field::GetVariable(right));
+    using Field = bond::detail::field_info<T, I>;
+
+    return Equal<Protocols>(Field::GetVariable(left), Field::GetVariable(right))
+        && CompareFields<Protocols, I + 1>(left, right);
 }

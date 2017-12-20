@@ -51,14 +51,20 @@ reflection_h export_attribute cpp file imports declarations = ("_reflection.h", 
         #{newlineBeginSep 2 fieldMetadata structFields}
 
         public: struct var
-        {#{fieldTemplates structFields}};
+        {#{fieldTemplates indexedFields}};
 
-        private: typedef boost::mpl::list<> fields0;
-        #{newlineSep 2 pushField indexedFields}
+        using field_count = std::integral_constant<uint16_t, #{length structFields}>;
 
-        public: typedef #{typename}fields#{length structFields}::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        #{fieldIds indexedFields}
         #{constructor}
-        
         static ::bond::Metadata GetMetadata()
         {
             return ::bond::reflection::MetadataInit#{metadataInitArgs}("#{declName}", "#{getDeclTypeName idl s}",
@@ -78,7 +84,7 @@ reflection_h export_attribute cpp file imports declarations = ("_reflection.h", 
         onlyTemplate x = if null declParams then mempty else x
         onlyNonTemplate x = if null declParams then x else mempty
 
-        metadataInitArgs = onlyTemplate [lt|<boost::mpl::list#{classParams} >|]
+        metadataInitArgs = onlyTemplate [lt|<::bond::detail::mpl::list#{classParams} >|]
 
         typename = onlyTemplate [lt|typename |]
 
@@ -89,33 +95,35 @@ reflection_h export_attribute cpp file imports declarations = ("_reflection.h", 
             // Force instantiation of template statics
             (void)metadata;
             #{newlineSep 3 static structFields}
-        }|]
+        }
+        |]
           where
             static Field {..} = [lt|(void)s_#{fieldName}_metadata;|]
         
-        -- reversed list of field names zipped with indexes
-        indexedFields :: [(String, Int)]
-        indexedFields = zipWith ((,) . fieldName) (reverse structFields) [0..]
+        -- list of fields zipped with indexes
+        indexedFields :: [(Field, Int)]
+        indexedFields = zip structFields [0..]
 
         baseType (Just base) = cppType base
         baseType Nothing = "::bond::no_base"
 
-        pushField (field, i) =
-            [lt|private: typedef #{typename}boost::mpl::push_front<fields#{i}, #{typename}var::#{field}>::type fields#{i + 1};|]
+        fieldIds = F.foldMap $ \ (Field {..}, i) -> [lt|template <int __bond_dummy> struct field<#{i}, __bond_dummy> : ::bond::detail::mpl::identity<#{typename}var::#{fieldName}> {};
+        |]
 
         fieldMetadata Field {..} =
             [lt|private: #{export_attr}static const ::bond::Metadata s_#{fieldName}_metadata;|]
 
-        fieldTemplates = F.foldMap $ \ f@Field {..} -> [lt|
+        fieldTemplates = F.foldMap $ \ (f@Field {..}, i) -> [lt|
             // #{fieldName}
             typedef struct : ::bond::reflection::FieldTemplate<
                 #{fieldOrdinal},
+                #{i},
                 #{CPP.modifierTag f},
                 #{className},
                 #{cppType fieldType},
                 &#{className}::#{fieldName},
                 &s_#{fieldName}_metadata
-            > {}  #{fieldName};
+            > {} #{fieldName};
         |]
 
 

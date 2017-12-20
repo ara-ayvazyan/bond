@@ -16,6 +16,7 @@ using bond::string_length;
 #include "moved.h"
 
 #include <boost/mpl/copy.hpp>
+#include <boost/mpl/list.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
@@ -371,9 +372,15 @@ T InitRandom(uint32_t max_string_length = c_max_string_length, uint32_t max_list
 }
 
 
-template <typename Field> struct
-is_optional_field
-    : std::is_same<typename Field::field_modifier, bond::reflection::optional_field_modifier> {};
+template <typename Schema, uint16_t I = 0, typename Enable = void> struct
+optional_field_count
+    : std::integral_constant<uint16_t,
+        (std::is_same<typename Schema::template field<I>::type::field_modifier, bond::reflection::optional_field_modifier>::value ? 1 : 0)
+        + optional_field_count<Schema, I + 1>::value> {};
+
+template <typename Schema, uint16_t I> struct
+optional_field_count<Schema, I, typename boost::enable_if_c<(I == Schema::field_count::value)>::type>
+    : std::integral_constant<uint16_t, 0> {};
 
 
 template <typename Protocols = bond::BuiltInProtocols, typename T>
@@ -406,7 +413,7 @@ void Binding(const From& from, uint16_t version = bond::v1)
 #pragma warning(push)
 #pragma warning(disable: 4127) // C4127: conditional expression is constant
 #endif
-        if (boost::mpl::count_if<typename From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (optional_field_count<typename From::Schema>::value == 0)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -430,7 +437,7 @@ void Binding(const From& from, uint16_t version = bond::v1)
 #pragma warning(push)
 #pragma warning(disable: 4127) // C4127: conditional expression is constant
 #endif
-        if (boost::mpl::count_if<typename From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (optional_field_count<typename From::Schema>::value == 0)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -486,7 +493,7 @@ void Mapping(const From& from, uint16_t version = bond::v1)
 
         To to;
 
-        if (boost::mpl::count_if<From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (optional_field_count<typename From::Schema>::value == 0)
         {
             to = InitRandom<To, Protocols>();
             Fixup(to);
@@ -503,7 +510,7 @@ void Mapping(const From& from, uint16_t version = bond::v1)
 
         To to;
 
-        if (boost::mpl::count_if<From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (optional_field_count<typename From::Schema>::value == 0)
         {
             to = InitRandom<To, Protocols>();
             Fixup(to);

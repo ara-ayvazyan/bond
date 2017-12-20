@@ -62,9 +62,9 @@ namespace bond
 template <typename T> struct
 get_field_template
 {
-    template <uint16_t field_id, typename ModifierTag, typename Struct, typename FieldType, FieldType Struct::*field_ptr, const bond::Metadata* metadata_ptr>
-    static bond::reflection::FieldTemplate<field_id, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr> helper(
-        const bond::reflection::FieldTemplate<field_id, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr>&);
+    template <uint16_t field_id, uint16_t field_index, typename ModifierTag, typename Struct, typename FieldType, FieldType Struct::*field_ptr, const bond::Metadata* metadata_ptr>
+    static bond::reflection::FieldTemplate<field_id, field_index, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr> helper(
+        const bond::reflection::FieldTemplate<field_id, field_index, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr>&);
 
     typedef decltype(helper(T())) type;
 };
@@ -74,8 +74,8 @@ template <typename T, typename U = typename get_field_template<T>::type>
 struct ordered_non_unique_field;
 
 
-template <typename T, uint16_t field_id, typename ModifierTag, typename Struct, typename FieldType, FieldType Struct::*field_ptr, const bond::Metadata* metadata_ptr>
-struct ordered_non_unique_field<T, bond::reflection::FieldTemplate<field_id, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr> >
+template <typename T, uint16_t field_id, uint16_t field_index, typename ModifierTag, typename Struct, typename FieldType, FieldType Struct::*field_ptr, const bond::Metadata* metadata_ptr>
+struct ordered_non_unique_field<T, bond::reflection::FieldTemplate<field_id, field_index, ModifierTag, Struct, FieldType, field_ptr, metadata_ptr> >
     : boost::multi_index::ordered_non_unique<
         boost::multi_index::tag<
             T

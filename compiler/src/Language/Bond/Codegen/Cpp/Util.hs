@@ -141,7 +141,7 @@ schemaMetadata _ s@Service {..} = [lt|
   where
     idl = MappingContext idlTypeMapping [] [] []
     idlNamespace = getDeclTypeName idl s
-    metadataInitArgs = if null declParams then mempty else [lt|<boost::mpl::list#{classParams s} >|]
+    metadataInitArgs = if null declParams then mempty else [lt|<::bond::detail::mpl::list#{classParams s} >|]
     -- static member definition for method metadata
     staticDef m = [lt|
     #{template s}const ::bond::Metadata #{className s}::Schema::s_#{methodName m}_metadata

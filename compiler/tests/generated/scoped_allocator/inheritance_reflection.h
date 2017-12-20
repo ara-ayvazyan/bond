@@ -22,18 +22,26 @@ namespace tests
             // x
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 Base,
                 int32_t,
                 &Base::x,
                 &s_x_metadata
-            > {}  x;
+            > {} x;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::x>::type fields1;
+        using field_count = std::integral_constant<uint16_t, 1>;
 
-        public: typedef fields1::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::x> {};
         
         
         static ::bond::Metadata GetMetadata()
@@ -61,18 +69,26 @@ namespace tests
             // x
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 Foo,
                 int32_t,
                 &Foo::x,
                 &s_x_metadata
-            > {}  x;
+            > {} x;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef boost::mpl::push_front<fields0, var::x>::type fields1;
+        using field_count = std::integral_constant<uint16_t, 1>;
 
-        public: typedef fields1::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<var::x> {};
         
         
         static ::bond::Metadata GetMetadata()

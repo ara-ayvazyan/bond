@@ -3,6 +3,7 @@
 #include <bond/core/bond.h>
 
 #include <boost/mpl/map.hpp>
+#include <boost/mpl/for_each.hpp>
 #include <type_traits>
 
 namespace polymorphic

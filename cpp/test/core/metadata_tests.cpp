@@ -260,22 +260,28 @@ TEST_CASE_BEGIN(get_list_sub_type_id_ListAndNullable)
 }
 TEST_CASE_END
 
-struct NoSubTypeAsserter
+
+template <typename T, std::size_t I = 0>
+typename boost::enable_if_c<(I == T::Schema::field_count::value)>::type
+AssertNoSubType()
+{}
+
+template <typename T, std::size_t I = 0>
+typename boost::disable_if_c<(I == T::Schema::field_count::value)>::type
+AssertNoSubType()
 {
-    template <typename Field>
-    void operator()(const Field&)
-    {
-        UT_AssertAreEqual(bond::ListSubType::NO_SUBTYPE,
-                          bond::get_list_sub_type_id<typename Field::field_type>::value);
-    }
-};
+    using Field = bond::detail::field_info<T, I>;
+
+    UT_AssertAreEqual(bond::ListSubType::NO_SUBTYPE,
+                      bond::get_list_sub_type_id<typename Field::field_type>::value);
+}
 
 TEST_CASE_BEGIN(EnsureUnknownSeqIDLType)
 {
     {
         // we test on the type's Schema instead of SchemaDef because--for
         // now--the list sub type is not present in TypeDef.
-        boost::mpl::for_each<StructWithDefaults::Schema::fields>(NoSubTypeAsserter());
+        AssertNoSubType<StructWithDefaults>();
     }
 }
 TEST_CASE_END

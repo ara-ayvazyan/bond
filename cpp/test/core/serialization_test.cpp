@@ -85,19 +85,12 @@ TEST_CASE_END
 // the tests that check payload length don't use nested structs.
 template <typename T> struct
 untagged_payload_size
-{
-    static const unsigned value = (boost::mpl::size<typename T::Schema::fields>::value + 7) / 8
-                                + untagged_payload_size<typename T::Schema::base>::value;
-};
-
-template <typename T>
-const unsigned untagged_payload_size<T>::value;
+    : std::integral_constant<unsigned,
+        (T::Schema::field_count::value + 7) / 8 + untagged_payload_size<typename T::Schema::base>::value> {};
 
 template <> struct
 untagged_payload_size<bond::no_base>
-{
-    static const unsigned value = 0;
-};
+    : std::integral_constant<unsigned, 0> {};
 
 
 template <typename Reader, typename Writer, typename T, typename Protocols>

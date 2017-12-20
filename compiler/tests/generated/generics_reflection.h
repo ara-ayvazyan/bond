@@ -24,29 +24,39 @@ namespace tests
             // t2
             typedef struct : ::bond::reflection::FieldTemplate<
                 0,
+                0,
                 ::bond::reflection::optional_field_modifier,
                 Foo<T1, T2>,
                 T2,
                 &Foo<T1, T2>::t2,
                 &s_t2_metadata
-            > {}  t2;
+            > {} t2;
         
             // n
             typedef struct : ::bond::reflection::FieldTemplate<
+                1,
                 1,
                 ::bond::reflection::optional_field_modifier,
                 Foo<T1, T2>,
                 ::bond::nullable< ::tests::Foo<T1, bool> >,
                 &Foo<T1, T2>::n,
                 &s_n_metadata
-            > {}  n;
+            > {} n;
         };
 
-        private: typedef boost::mpl::list<> fields0;
-        private: typedef typename boost::mpl::push_front<fields0, typename var::n>::type fields1;
-        private: typedef typename boost::mpl::push_front<fields1, typename var::t2>::type fields2;
+        using field_count = std::integral_constant<uint16_t, 2>;
 
-        public: typedef typename fields2::type fields;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4348) // VC bug: redefinition of default parameter
+#endif
+        template <uint16_t I, int = 0> struct field;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+        template <int __bond_dummy> struct field<0, __bond_dummy> : ::bond::detail::mpl::identity<typename var::t2> {};
+        template <int __bond_dummy> struct field<1, __bond_dummy> : ::bond::detail::mpl::identity<typename var::n> {};
+        
         
         Schema()
         {
@@ -58,7 +68,7 @@ namespace tests
         
         static ::bond::Metadata GetMetadata()
         {
-            return ::bond::reflection::MetadataInit<boost::mpl::list<T1, T2> >("Foo", "tests.Foo",
+            return ::bond::reflection::MetadataInit<::bond::detail::mpl::list<T1, T2> >("Foo", "tests.Foo",
                 ::bond::reflection::Attributes()
             );
         }
