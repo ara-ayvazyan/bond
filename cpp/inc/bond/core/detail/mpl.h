@@ -103,9 +103,10 @@ apply_functor<list<T...> >
     template <typename F>
     static void invoke(F&& f)
     {
+        (void)f;
         (void)std::initializer_list<int>{ (
             (void)f(identity<T>{}),
-            0)... }, f;
+            0)... };
     }
 };
 
@@ -120,6 +121,21 @@ void apply(F&& f)
 template <typename List> struct
 try_apply_functor;
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+template <typename T> struct
+try_apply_functor<list<T> >
+{
+    template <typename F>
+    static auto invoke(F&& f)
+#ifdef BOND_NO_CXX14_RETURN_TYPE_DEDUCTION
+        -> decltype(std::forward<F>(f)(identity<T>{}))
+#endif
+    {
+        return std::forward<F>(f)(identity<T>{});
+    }
+};
+#endif
+
 template <typename T, typename... U> struct
 try_apply_functor<list<T, U...> >
 {
@@ -133,6 +149,9 @@ try_apply_functor<list<T, U...> >
         {
             return result;
         }
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+        return try_apply_functor<list<U...> >::invoke(std::forward<F>(f));
+#else
         else
         {
             (void)std::initializer_list<int>{ (
@@ -141,6 +160,7 @@ try_apply_functor<list<T, U...> >
 
             return result;
         }
+#endif
     }
 };
 

@@ -11,6 +11,7 @@
 
 #include <boost/assert.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/mpl/for_each.hpp>
 
 #include <map>
 #include <string>

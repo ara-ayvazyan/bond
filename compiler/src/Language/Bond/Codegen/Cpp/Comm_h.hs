@@ -28,6 +28,8 @@ comm_h export_attribute cpp file imports declarations = ("_comm.h", [lt|
 #include <bond/comm/services.h>
 #include "#{file}_types.h"
 #{newlineSep 0 includeImport imports}
+#include <boost/mpl/list.hpp>
+#include <boost/mpl/push_front.hpp>
 
 #{CPP.openNamespace cpp}
     #{doubleLineSep 1 comm declarations}
