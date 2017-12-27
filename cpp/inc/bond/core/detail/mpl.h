@@ -23,8 +23,8 @@ namespace bond
 namespace detail { namespace mpl
 {
 
-template <typename T>
-struct identity
+template <typename T> struct
+identity
 {
     using type = T;
 };
@@ -97,22 +97,15 @@ at<list<T, U...>, I> : at<list<U...>, I - 1> {};
 template <typename List>
 struct apply_functor;
 
-template <> struct
-apply_functor<list<> >
-{
-    template <typename F>
-    static void invoke(F&& /*f*/)
-    {}
-};
-
 template <typename... T> struct
 apply_functor<list<T...> >
 {
     template <typename F>
     static void invoke(F&& f)
     {
-        (void)f;
-        (void)std::initializer_list<int>{ ((void)f(identity<T>{}), 0)... };
+        (void)std::initializer_list<int>{ (
+            (void)f(identity<T>{}),
+            0)... }, f;
     }
 };
 
@@ -127,19 +120,6 @@ void apply(F&& f)
 template <typename List> struct
 try_apply_functor;
 
-template <typename T> struct
-try_apply_functor<list<T> >
-{
-    template <typename F>
-    static auto invoke(F&& f)
-#ifdef BOND_NO_CXX14_RETURN_TYPE_DEDUCTION
-        -> decltype(std::forward<F>(f)(identity<T>{}))
-#endif
-    {
-        return std::forward<F>(f)(identity<T>{});
-    }
-};
-
 template <typename T, typename... U> struct
 try_apply_functor<list<T, U...> >
 {
@@ -153,8 +133,14 @@ try_apply_functor<list<T, U...> >
         {
             return result;
         }
+        else
+        {
+            (void)std::initializer_list<int>{ (
+                (void)(result || (result = f(identity<U>{}))),
+                0)... };
 
-        return try_apply_functor<list<U...> >::invoke(std::forward<F>(f));
+            return result;
+        }
     }
 };
 
@@ -168,6 +154,29 @@ auto try_apply(F&& f)
     return try_apply_functor<List>::invoke(std::forward<F>(f));
 }
 
+
+#ifdef BOND_NO_CXX14_INTEGER_SEQUENCE
+
+template <std::size_t...> struct
+index_sequence;
+
+template <std::size_t I, std::size_t... X> struct
+make_index_sequence_type
+    : make_index_sequence_type<I - 1, I - 1, X...> {};
+
+template <std::size_t... X> struct
+make_index_sequence_type<0, X...>
+    : mpl::identity<index_sequence<X...> > {};
+
+template <std::size_t N>
+using make_index_sequence = typename make_index_sequence_type<N>::type;
+
+#else
+
+using std::index_sequence;
+using std::make_index_sequence;
+
+#endif
 
 }} // namespace mpl { namespace detail
 

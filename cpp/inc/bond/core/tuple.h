@@ -15,30 +15,6 @@ namespace bond
 namespace detail
 {
 
-#ifdef BOND_NO_CXX14_INTEGER_SEQUENCE
-
-template <std::size_t...> struct
-index_sequence;
-
-template <std::size_t I, std::size_t... X> struct
-make_index_sequence_type
-    : make_index_sequence_type<I - 1, I - 1, X...> {};
-
-template <std::size_t... X> struct
-make_index_sequence_type<0, X...>
-    : mpl::identity<index_sequence<X...> > {};
-
-template <std::size_t N>
-using make_index_sequence = typename make_index_sequence_type<N>::type;
-
-#else
-
-using std::index_sequence;
-using std::make_index_sequence;
-
-#endif
-
-
 template <typename T, std::size_t I> struct
 indexed_item
     : std::integral_constant<std::size_t, I>
@@ -61,7 +37,7 @@ template <typename List, typename Indices> struct
 indexed_list_helper;
 
 template <typename... T, std::size_t... I> struct
-indexed_list_helper<mpl::list<T...>, index_sequence<I...> >
+indexed_list_helper<mpl::list<T...>, mpl::index_sequence<I...> >
     : mpl::identity<mpl::list<indexed_item<T, I>...> > {};
 
 template <typename List> struct
@@ -69,7 +45,7 @@ indexed_list;
 
 template <typename... T> struct
 indexed_list<mpl::list<T...> >
-    : indexed_list_helper<mpl::list<T...>, make_index_sequence<sizeof...(T)> > {};
+    : indexed_list_helper<mpl::list<T...>, mpl::make_index_sequence<sizeof...(T)> > {};
 
 
 } // namespace detail

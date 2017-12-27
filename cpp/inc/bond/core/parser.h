@@ -117,7 +117,7 @@ private:
     // use compile-time schema
     template <typename Schema, typename Transform>
     bool
-    ReadFields(Schema, const Transform& transform)
+    ReadFields(const Schema&, const Transform& transform)
     {
         return ReadFields<Schema, 0>(transform);
     }
@@ -323,7 +323,7 @@ private:
     // use compile-time schema
     template <typename Schema, typename Transform>
     void
-    ReadFields(Schema, uint16_t& id, BondDataType& type, const Transform& transform)
+    ReadFields(const Schema&, uint16_t& id, BondDataType& type, const Transform& transform)
     {
         ReadFields<Schema, 0>(id, type, transform);
     }
@@ -585,7 +585,7 @@ private:
 
     // use compile-time schema
     template <typename Schema, typename Transform>
-    bool ReadFields(Schema, const Transform& transform)
+    bool ReadFields(const Schema&, const Transform& transform)
     {
         return ReadFields<Schema, 0>(transform);
     }
