@@ -5,6 +5,8 @@
 #include "service_types.h"
 #include "basic_types_comm.h"
 #include "namespace_basic_types_comm.h"
+#include <boost/mpl/list.hpp>
+#include <boost/mpl/push_front.hpp>
 
 namespace tests
 {

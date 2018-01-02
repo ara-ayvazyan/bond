@@ -4,6 +4,8 @@
 #include <bond/comm/services.h>
 #include "generic_service_types.h"
 
+#include <boost/mpl/list.hpp>
+#include <boost/mpl/push_front.hpp>
 
 namespace tests
 {
