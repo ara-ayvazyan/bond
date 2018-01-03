@@ -18,10 +18,6 @@
 
 #include <boost/static_assert.hpp>
 
-#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
-#include <functional>
-#endif
-
 namespace bond
 {
 
@@ -520,14 +516,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
-#else
-            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<T, nested_fields<T>::template type>(id, visitor);
+        detail::search_field<T, nested_fields<T>::template type>(id, MakeAssignToFieldFunctor(value));
         return false;
     }
 
@@ -535,14 +524,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
-#else
-            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<T, matching_fields<T, X>::template type>(id, visitor);
+        detail::search_field<T, matching_fields<T, X>::template type>(id, MakeAssignToFieldFunctor(value));
         return false;
     }
 
@@ -550,14 +532,7 @@ public:
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToField<typename std::decay<decltype(identity)>::type::type>(value); };
-#else
-            std::bind(AssignToFieldFunctor{}, std::cref(*this), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<T, container_fields<T>::template type>(id, visitor);
+        detail::search_field<T, container_fields<T>::template type>(id, MakeAssignToFieldFunctor(value));
         return false;
     }
 
@@ -604,16 +579,29 @@ private:
         AssignToVar<Protocols>(FieldT::GetVariable(_var), value);
     }
 
-#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
+    template <typename X>
     struct AssignToFieldFunctor
     {
-        template <typename X, typename FieldT>
-        void operator()(const To& transform, const X& value, const detail::mpl::identity<FieldT>&) const
+        AssignToFieldFunctor(const To& transform, const X& value)
+            : _transform(transform),
+              _value(value)
+        {}
+
+        template <typename FieldT>
+        void operator()(const detail::mpl::identity<FieldT>&) const
         {
-            transform.AssignToField<FieldT>(value);
+            _transform.AssignToField<FieldT>(_value);
         }
+
+        const To& _transform;
+        const X& _value;
     };
-#endif
+
+    template <typename X>
+    AssignToFieldFunctor<X> MakeAssignToFieldFunctor(const X& value) const
+    {
+        return AssignToFieldFunctor<X>{ *this, value };
+    }
 
     BOND_NORETURN void UnexpectedStructStopException() const
     {
@@ -717,14 +705,7 @@ protected:
     template <typename Protocols, typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; Assign<Protocols, typename std::decay<decltype(identity)>::type::type>(var, ids, value); };
-#else
-            std::bind(AssignFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(ids), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<V, struct_fields<V>::template type>(*ids.current, visitor);
+        detail::search_field<V, struct_fields<V>::template type>(*ids.current, MakeAssignFunctor<Protocols>(var, ids, value));
         return false;
     }
 
@@ -748,14 +729,7 @@ protected:
     template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
-#else
-            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<V, nested_fields<V>::template type>(id, visitor);
+        detail::search_field<V, nested_fields<V>::template type>(id, MakeAssignToVarFunctor<Protocols>(var, value));
         return false;
     }
 
@@ -763,14 +737,7 @@ protected:
     template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
-#else
-            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<V, matching_fields<V, X>::template type>(id, visitor);
+        detail::search_field<V, matching_fields<V, X>::template type>(id, MakeAssignToVarFunctor<Protocols>(var, value));
         return false;
     }
 
@@ -778,14 +745,7 @@ protected:
     template <typename Protocols, typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        auto visitor =
-#ifndef BOND_NO_CXX14_GENERIC_LAMBDAS
-            [&](const auto& identity) { (void)identity; AssignToVar<Protocols, typename std::decay<decltype(identity)>::type::type>(var, value); };
-#else
-            std::bind(AssignToVarFunctor<Protocols>{}, std::cref(*this), std::ref(var), std::cref(value), std::placeholders::_1);
-#endif
-
-        detail::search_field<V, container_fields<V>::template type>(id, visitor);
+        detail::search_field<V, container_fields<V>::template type>(id, MakeAssignToVarFunctor<Protocols>(var, value));
         return false;
     }
 
@@ -810,27 +770,59 @@ protected:
     }
 
 private:
-#ifdef BOND_NO_CXX14_GENERIC_LAMBDAS
-    template <typename Protocols>
+    template <typename Protocols, typename V, typename X>
     struct AssignFunctor
     {
-        template <typename V, typename X, typename FieldT>
-        void operator()(const MapTo& transform, V& var, const PathView& ids, const X& value, const mpl::identity<FieldT>&) const
+        AssignFunctor(const MapTo& transform, V& var, const PathView& ids, const X& value)
+            : _transform(transform),
+              _var(var),
+              _ids(ids),
+              _value(value)
+        {}
+
+        template <typename FieldT>
+        void operator()(const mpl::identity<FieldT>&) const
         {
-            transform.Assign<Protocols, FieldT>(var, ids, value);
+            _transform.Assign<Protocols, FieldT>(_var, _ids, _value);
         }
+
+        const MapTo& _transform;
+        V& _var;
+        const PathView& _ids;
+        const X& _value;
     };
 
-    template <typename Protocols>
+    template <typename Protocols, typename V, typename X>
+    AssignFunctor<Protocols, V, X> MakeAssignFunctor(V& var, const PathView& ids, const X& value) const
+    {
+        return AssignFunctor<Protocols, V, X>{ *this, var, ids, value };
+    }
+
+    template <typename Protocols, typename V, typename X>
     struct AssignToVarFunctor
     {
-        template <typename V, typename X, typename FieldT>
-        void operator()(const MapTo& transform, V& var, const X& value, const mpl::identity<FieldT>&) const
+        AssignToVarFunctor(const MapTo& transform, V& var, const X& value)
+            : _transform(transform),
+              _var(var),
+              _value(value)
+        {}
+
+        template <typename FieldT>
+        void operator()(const mpl::identity<FieldT>&) const
         {
-            transform.AssignToVar<Protocols, FieldT>(var, value);
+            _transform.AssignToVar<Protocols, FieldT>(_var, _value);
         }
+
+        const MapTo& _transform;
+        V& _var;
+        const X& _value;
     };
-#endif
+
+    template <typename Protocols, typename V, typename X>
+    AssignToVarFunctor<Protocols, V, X> MakeAssignToVarFunctor(V& var, const X& value) const
+    {
+        return AssignToVarFunctor<Protocols, V, X>{ *this, var, value };
+    }
 };
 
 } // namespace detail
