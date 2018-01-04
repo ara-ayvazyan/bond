@@ -440,7 +440,7 @@ struct linear_search_field_functor<N, N>
 template <typename T, template <uint16_t> class C, uint16_t I, uint16_t N, typename F>
 inline bool linear_search_field(uint16_t id, F&& f)
 {
-    return linear_search_field_functor<0, schema<T>::type::field_count::value>
+    return linear_search_field_functor<I, schema<T>::type::field_count::value>
         ::template invoke<T, C>(id, std::forward<F>(f));
 }
 
