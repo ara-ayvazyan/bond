@@ -52,20 +52,20 @@ add_target_to_folder (protobuf_test_codegen)
 add_library (core_test_common
     EXCLUDE_FROM_ALL
     "main.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/allocator_test_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_apply.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test2_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_apply.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/validation_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test1_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test2_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/cmdargs_types.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_apply.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/capped_allocator_tests_generated/allocator_test_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/allocator_test_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_apply.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test2_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_apply.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/validation_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test1_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test2_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/cmdargs_types.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_apply.cpp"
+    #"${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/capped_allocator_tests_generated/allocator_test_types.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/protobuf_writer_types.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/protobuf_writer_apply.cpp")
 add_target_to_folder (core_test_common)
@@ -131,7 +131,7 @@ add_bond_codegen (TARGET unit_test_codegen4
 # Since debugging such large executable is not practical anyways,
 # we disable .pdb generation.
 # TODO: add support for selecting individual test case via ENABLE_TEST_CASE macro.
-no_pdb()
+#no_pdb()
 
 
 add_unit_test (allocator_test.cpp)
@@ -165,6 +165,10 @@ add_unit_test (pass_through.cpp)
 add_unit_test (protobuf_writer_test.cpp)
 add_dependencies(protobuf_writer_test protobuf_test_codegen)
 target_link_libraries(protobuf_writer_test PRIVATE protobuf_test_codegen)
+
+add_unit_test (protobuf_reader_test.cpp)
+add_dependencies(protobuf_reader_test protobuf_test_codegen)
+target_link_libraries(protobuf_reader_test PRIVATE protobuf_test_codegen)
 
 add_unit_test (protocol_test.cpp)
 add_unit_test (required_fields_tests.cpp)
