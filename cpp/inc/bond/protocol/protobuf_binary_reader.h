@@ -427,6 +427,15 @@ namespace bond
         }
 
         template <typename T>
+        typename boost::enable_if<is_string_type<T> >::type
+        Read(T& value)
+        {
+            uint32_t length = 0;
+            ReadVarInt(length);
+            detail::ReadStringData(_input, value, length);
+        }
+
+        template <typename T>
         void Skip()
         {
             Skip();

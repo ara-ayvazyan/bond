@@ -302,18 +302,26 @@ namespace
 
 BOOST_AUTO_TEST_SUITE(ProtobufReaderTests)
 
-BOOST_AUTO_TEST_CASE(ExperimentTest)
+template <typename Proto, typename Bond>
+void CheckBinaryFormat()
 {
-    auto bond_struct = InitRandom<unittest::Integers>();
-    unittest::proto::Integers proto_struct;
+    auto bond_struct = InitRandom<Bond>();
+    Proto proto_struct;
     bond::Apply(ToProto{ proto_struct }, bond_struct);
 
     auto str = proto_struct.SerializeAsString();
 
     bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
     bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
-    auto bond_struct2 = bond::Deserialize<unittest::Integers>(reader, bond::GetRuntimeSchema<unittest::Integers>());
+    auto bond_struct2 = bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
     BOOST_CHECK((bond_struct == bond_struct2));
+}
+
+BOOST_AUTO_TEST_CASE(ExperimentTest)
+{
+    CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
+
+    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::string> >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
