@@ -322,6 +322,10 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
 
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::string> >();
+
+    CheckBinaryFormat<
+        unittest::proto::NestedStruct,
+        unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()

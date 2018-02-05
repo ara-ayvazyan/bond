@@ -145,6 +145,7 @@ namespace bond
                         switch (wire_type)
                         {
                         case WireType::VarInt:
+                        case WireType::Fixed32:
                         case WireType::Fixed64:
                             transform.Field(id, it->metadata, value<uint64_t, Input&>(_input));
                             continue;
@@ -227,6 +228,7 @@ namespace bond
                         case WireType::VarInt:
                             _input.SetEncoding(detail::proto::ReadEncoding(BT_INT64, it->metadata));
                             // fall-through
+                        case WireType::Fixed32:
                         case WireType::Fixed64:
                             transform.Field(id, it->metadata, value<int64_t, Input&>(_input));
                             continue;
@@ -234,9 +236,12 @@ namespace bond
                         break;
 
                     case BT_STRUCT:
-                        // TODO:
-                        BOOST_ASSERT(false); // Not implemented
-                        //transform.Field(id, it->metadata, bonded<void, Input>(_input, RuntimeSchema{ schema, *it }));
+                        switch (wire_type)
+                        {
+                        case WireType::LengthDelimited:
+                            transform.Field(id, it->metadata, bonded<void, Input>(_input, RuntimeSchema{ schema, *it }));
+                            continue;
+                        }
                         break;
 
                     case BT_LIST:
@@ -295,6 +300,12 @@ namespace bond
         void ReadStructBegin(bool base = false)
         {
             BOOST_VERIFY(!base);
+
+            if (_type == WireType::LengthDelimited)
+            {
+                uint32_t size;
+                ReadVarInt(size);
+            }
         }
 
         void ReadStructEnd(bool base = false)
@@ -430,9 +441,20 @@ namespace bond
         typename boost::enable_if<is_string_type<T> >::type
         Read(T& value)
         {
-            uint32_t length = 0;
-            ReadVarInt(length);
-            detail::ReadStringData(_input, value, length);
+            switch (_type)
+            {
+            case WireType::LengthDelimited:
+                {
+                    uint32_t length = 0;
+                    ReadVarInt(length);
+                    detail::ReadStringData(_input, value, length);
+                }
+                break;
+
+            default:
+                BOOST_ASSERT(false);
+                break;
+            }
         }
 
         template <typename T>
@@ -444,6 +466,7 @@ namespace bond
         template <typename T>
         void Skip(const bonded<T, ProtobufBinaryReader&>&)
         {
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
             Skip();
         }
 
