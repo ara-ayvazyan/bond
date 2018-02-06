@@ -19,8 +19,8 @@ namespace
     public:
         explicit ToProto(google::protobuf::Message& msg)
             : _message{ msg },
-            _reflection{ *_message.GetReflection() },
-            _descriptor{ *_message.GetDescriptor() }
+              _reflection{ *_message.GetReflection() },
+              _descriptor{ *_message.GetDescriptor() }
         {}
 
         void Begin(const bond::Metadata&) const
@@ -41,7 +41,7 @@ namespace
 
         template <typename T>
         typename boost::disable_if<bond::is_container<T>, bool>::type
-            Field(uint16_t id, const bond::Metadata& /*metadata*/, const T& value) const
+        Field(uint16_t id, const bond::Metadata& /*metadata*/, const T& value) const
         {
             SetValue(GetField(id), value);
             return false;
@@ -49,7 +49,7 @@ namespace
 
         template <typename T>
         typename boost::enable_if<bond::is_container<T>, bool>::type
-            Field(uint16_t id, const bond::Metadata& /*metadata*/, const T& value) const
+        Field(uint16_t id, const bond::Metadata& /*metadata*/, const T& value) const
         {
             const auto& field = GetField(id);
             for (bond::const_enumerator<T> items(value); items.more(); )
@@ -61,7 +61,7 @@ namespace
 
         template <typename T, typename Reader>
         typename boost::enable_if<bond::is_basic_type<T>, bool>::type
-            Field(uint16_t id, const bond::Metadata& metadata, const bond::value<T, Reader>& value) const
+        Field(uint16_t id, const bond::Metadata& metadata, const bond::value<T, Reader>& value) const
         {
             T data{};
             value.Deserialize(data);
@@ -127,7 +127,7 @@ namespace
 
         template <typename T>
         typename boost::enable_if<bond::is_bond_type<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             auto msg = _reflection.MutableMessage(&_message, &field);
             BOOST_ASSERT(msg);
@@ -136,7 +136,7 @@ namespace
 
         template <typename T, typename Reader>
         typename boost::disable_if<bond::is_basic_type<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, const bond::value<T, Reader>& value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, const bond::value<T, Reader>& value) const
         {
             auto msg = _reflection.MutableMessage(&_message, &field);
             BOOST_ASSERT(msg);
@@ -145,7 +145,7 @@ namespace
 
         template <typename T>
         typename boost::enable_if<bond::is_bond_type<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
+        AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             auto msg = _reflection.AddMessage(&_message, &field);
             BOOST_ASSERT(msg);
@@ -154,42 +154,42 @@ namespace
 
         template <typename T>
         typename boost::enable_if<std::is_enum<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, T value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.SetEnumValue(&_message, &field, value);
         }
 
         template <typename T>
         typename boost::enable_if<std::is_enum<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& field, T value) const
+        AddValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.AddEnumValue(&_message, &field, value);
         }
 
         template <typename T>
         typename boost::enable_if<bond::is_signed_int<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, T value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.SetInt32(&_message, &field, value);
         }
 
         template <typename T>
         typename boost::enable_if<bond::is_signed_int<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& field, T value) const
+        AddValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.AddInt32(&_message, &field, value);
         }
 
         template <typename T>
         typename boost::enable_if<std::is_unsigned<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, T value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.SetUInt32(&_message, &field, value);
         }
 
         template <typename T>
         typename boost::enable_if<std::is_unsigned<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& field, T value) const
+        AddValue(const google::protobuf::FieldDescriptor& field, T value) const
         {
             _reflection.AddUInt32(&_message, &field, value);
         }
@@ -201,7 +201,7 @@ namespace
 
         template <typename T>
         typename boost::enable_if<bond::is_string<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
+        SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             SetValue(field, google::protobuf::string{ string_data(value), string_length(value) });
         }
@@ -213,23 +213,23 @@ namespace
 
         template <typename T>
         typename boost::enable_if<bond::is_string<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
+        AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             AddValue(field, google::protobuf::string{ string_data(value), string_length(value) });
         }
 
         template <typename T>
         typename boost::enable_if<bond::is_wstring<T> >::type
-            SetValue(const google::protobuf::FieldDescriptor& /*field*/, const T& /*value*/) const
+        SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
-            BOOST_ASSERT(false);
+            SetValue(field, boost::locale::conv::utf_to_utf<char>(value));
         }
 
         template <typename T>
         typename boost::enable_if<bond::is_wstring<T> >::type
-            AddValue(const google::protobuf::FieldDescriptor& /*field*/, const T& /*value*/) const
+        AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
-            BOOST_ASSERT(false);
+            AddValue(field, boost::locale::conv::utf_to_utf<char>(value));
         }
 
         void SetValue(const google::protobuf::FieldDescriptor& field, bool value) const
@@ -322,6 +322,8 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
 
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::string> >();
+
+    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::wstring> >();
 
     CheckBinaryFormat<
         unittest::proto::NestedStruct,

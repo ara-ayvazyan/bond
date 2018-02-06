@@ -9,6 +9,8 @@
 #include <bond/core/detail/omit_default.h>
 #include <bond/core/bond_types.h>
 
+#include <boost/locale.hpp>
+
 /*
     Implements Protocol Buffers binary encoding.
     See https://developers.google.com/protocol-buffers/docs/encoding for details.
@@ -180,7 +182,12 @@ namespace bond
                         break;
 
                     case BT_WSTRING:
-                        BOOST_ASSERT(false);
+                        switch (wire_type)
+                        {
+                        case WireType::LengthDelimited:
+                            transform.Field(id, it->metadata, value<std::wstring, Input&>(_input));
+                            continue;
+                        }
                         break;
 
                     case BT_INT8:
@@ -438,7 +445,7 @@ namespace bond
         }
 
         template <typename T>
-        typename boost::enable_if<is_string_type<T> >::type
+        typename boost::enable_if<is_string<T> >::type
         Read(T& value)
         {
             switch (_type)
@@ -455,6 +462,15 @@ namespace bond
                 BOOST_ASSERT(false);
                 break;
             }
+        }
+
+        template <typename T>
+        typename boost::enable_if<is_wstring<T> >::type
+        Read(T& value)
+        {
+            std::string str;
+            Read(str);
+            value = boost::locale::conv::utf_to_utf<typename element_type<T>::type>(str);
         }
 
         template <typename T>
