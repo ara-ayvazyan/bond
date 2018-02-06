@@ -82,11 +82,10 @@ namespace bond
             WireType wire_type;
             uint16_t id;
 
-            for (auto it = fields.begin();
-                    _input.ReadFieldBegin(wire_type, id);
-                    _input.ReadFieldEnd(), it != fields.end() ? ++it : it)
+            for (auto it = fields.begin(); _input.ReadFieldBegin(wire_type, id); _input.ReadFieldEnd())
             {
-                if (it == fields.end() || it->id != id)
+                if (it == fields.end()
+                    || (it->id != id && (++it == fields.end() || it->id != id)))
                 {
                     it = std::lower_bound(
                         fields.begin(),
@@ -253,6 +252,12 @@ namespace bond
 
                     case BT_LIST:
                     case BT_SET:
+                        BOOST_ASSERT(it->type.element.hasvalue());
+                        _input.SetEncoding(detail::proto::ReadEncoding(it->type.element->id, it->metadata));
+                        _input.SetType(it->type.element->id);
+                        transform.Field(id, it->metadata, value<void, Input>(_input, RuntimeSchema{ schema, *it }));
+                        continue;
+
                     case BT_MAP:
                         // TODO:
                         BOOST_ASSERT(false); // Not implemented
@@ -299,20 +304,16 @@ namespace bond
 
         explicit ProtobufBinaryReader(const Buffer& input)
             : _input{ input },
-              _type{ detail::proto::Unavailable<WireType>() },
+              _wire{ detail::proto::Unavailable<WireType>() },
               _id{ 0 },
-              _encoding{ detail::proto::Unavailable<Encoding>() }
+              _encoding{ detail::proto::Unavailable<Encoding>() },
+              _size{ 0 },
+              _type{ BT_UNAVAILABLE }
         {}
 
         void ReadStructBegin(bool base = false)
         {
             BOOST_VERIFY(!base);
-
-            if (_type == WireType::LengthDelimited)
-            {
-                uint32_t size;
-                ReadVarInt(size);
-            }
         }
 
         void ReadStructEnd(bool base = false)
@@ -324,7 +325,7 @@ namespace bond
         {
             if (ReadTag())
             {
-                type = _type;
+                type = _wire;
                 id = _id;
                 return true;
             }
@@ -335,6 +336,21 @@ namespace bond
         void SetEncoding(Encoding encoding)
         {
             _encoding = encoding;
+        }
+
+        void SetType(BondDataType type)
+        {
+            _type = type;
+        }
+
+        BondDataType GetType() const
+        {
+            return _type;
+        }
+
+        const uint32_t& GetSize() const
+        {
+            return _size;
         }
 
         void ReadFieldEnd()
@@ -357,7 +373,7 @@ namespace bond
         {
             BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_type)
+            switch (_wire)
             {
             case WireType::VarInt:
                 {
@@ -380,9 +396,9 @@ namespace bond
         Read(T& value)
         {
             BOOST_STATIC_ASSERT(sizeof(T) <= sizeof(uint64_t));
-            BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>());
+            //BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_type)
+            switch (_wire)
             {
             case WireType::VarInt:
                 ReadVarInt(value);
@@ -414,9 +430,9 @@ namespace bond
 
         void Read(float& value)
         {
-            BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
+            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_type)
+            switch (_wire)
             {
             case WireType::Fixed32:
                 _input.Read(value);
@@ -430,9 +446,9 @@ namespace bond
 
         void Read(double& value)
         {
-            BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
+            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_type)
+            switch (_wire)
             {
             case WireType::Fixed64:
                 _input.Read(value);
@@ -448,14 +464,11 @@ namespace bond
         typename boost::enable_if<is_string<T> >::type
         Read(T& value)
         {
-            switch (_type)
+            switch (_wire)
             {
             case WireType::LengthDelimited:
-                {
-                    uint32_t length = 0;
-                    ReadVarInt(length);
-                    detail::ReadStringData(_input, value, length);
-                }
+                BOOST_ASSERT(_size != 0);
+                detail::ReadStringData(_input, value, _size);
                 break;
 
             default:
@@ -482,13 +495,43 @@ namespace bond
         template <typename T>
         void Skip(const bonded<T, ProtobufBinaryReader&>&)
         {
-            BOOST_ASSERT(_type == WireType::LengthDelimited);
+            BOOST_ASSERT(_wire == WireType::LengthDelimited);
             Skip();
         }
 
         void Skip(BondDataType /*type*/)
         {
             Skip();
+        }
+
+        void Skip()
+        {
+            switch (_wire)
+            {
+            case WireType::VarInt:
+            {
+                uint64_t value;
+                ReadVarInt(value);
+            }
+            break;
+
+            case WireType::Fixed64:
+                _input.Skip(sizeof(uint64_t));
+                break;
+
+            case WireType::LengthDelimited:
+                BOOST_ASSERT(_size != 0);
+                _input.Skip(_size);
+                break;
+
+            case WireType::Fixed32:
+                _input.Skip(sizeof(uint32_t));
+                break;
+
+            default:
+                BOOST_ASSERT(false);
+                break;
+            }
         }
 
         bool operator==(const ProtobufBinaryReader& rhs) const
@@ -580,11 +623,22 @@ namespace bond
                 uint64_t tag;
                 ReadVariableUnsigned(_input, tag);
 
-                auto raw_type = static_cast<WireType>(tag & 0x7);
-                if (raw_type != WireType::VarInt && raw_type != WireType::Fixed64
-                    && raw_type != WireType::LengthDelimited && raw_type != WireType::Fixed32)
+                auto raw_wire = static_cast<WireType>(tag & 0x7);
+                switch (raw_wire)
                 {
+                case WireType::VarInt:
+                case WireType::Fixed32:
+                case WireType::Fixed64:
+                    _size = 0;
+                    break;
+
+                case WireType::LengthDelimited:
+                    ReadVarInt(_size);
+                    break;
+
+                default:
                     BOND_THROW(CoreException, "Unrecognized wire type.");
+                    break;
                 }
 
                 auto raw_id = tag >> 3;
@@ -593,7 +647,7 @@ namespace bond
                     BOND_THROW(CoreException, "Field ordinal does not fit in 16 bits.");
                 }
 
-                _type = static_cast<WireType>(raw_type);
+                _wire = static_cast<WireType>(raw_wire);
                 _id = static_cast<uint16_t>(raw_id);
                 _encoding = detail::proto::Unavailable<Encoding>();
 
@@ -603,44 +657,51 @@ namespace bond
             return false;
         }
 
-        void Skip()
-        {
-            switch (_type)
-            {
-            case WireType::VarInt:
-                {
-                    uint64_t value;
-                    ReadVarInt(value);
-                }
-                break;
-
-            case WireType::Fixed64:
-                _input.Skip(sizeof(uint64_t));
-                break;
-
-            case WireType::LengthDelimited:
-                {
-                    uint32_t size;
-                    ReadVarInt(size);
-                    _input.Skip(size);
-                }
-                break;
-
-            case WireType::Fixed32:
-                _input.Skip(sizeof(uint32_t));
-                break;
-
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
-        }
-
 
         Buffer _input;
-        WireType _type;
+        WireType _wire;
         uint16_t _id;
         Encoding _encoding;
+        uint32_t _size;
+        BondDataType _type;
     };
+
+
+    template <typename T>
+    inline void list_append(T& list, const typename element_type<T>::type& item)
+    {
+        list.push_back(item);
+    }
+
+    namespace detail
+    {
+        template <typename Buffer>
+        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& input, uint32_t /*size*/)
+        {
+            input.Skip();
+        }
+
+    } // namespace detail
+
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::enable_if<is_list_container<X> >::type
+    inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, const uint32_t& size)
+    {
+        do
+        {
+            typename element_type<X>::type item = make_element(var);
+            element.template Deserialize<Protocols>(item);
+            list_append(var, item);
+
+        } while (size != 0);
+    }
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::enable_if<is_list_container<X> >::type
+    inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
+    {
+        detail::MatchingTypeContainer<Protocols>(var, input.GetType(), input, input.GetSize());
+    }
 
 } // namespace bond
