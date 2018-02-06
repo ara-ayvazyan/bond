@@ -254,7 +254,6 @@ namespace bond
                     case BT_SET:
                         BOOST_ASSERT(it->type.element.hasvalue());
                         _input.SetEncoding(detail::proto::ReadEncoding(it->type.element->id, it->metadata));
-                        _input.SetType(it->type.element->id);
                         transform.Field(id, it->metadata, value<void, Input>(_input, RuntimeSchema{ schema, *it }));
                         continue;
 
@@ -307,8 +306,7 @@ namespace bond
               _wire{ detail::proto::Unavailable<WireType>() },
               _id{ 0 },
               _encoding{ detail::proto::Unavailable<Encoding>() },
-              _size{ 0 },
-              _type{ BT_UNAVAILABLE }
+              _size{ 0 }
         {}
 
         void ReadStructBegin(bool base = false)
@@ -336,16 +334,6 @@ namespace bond
         void SetEncoding(Encoding encoding)
         {
             _encoding = encoding;
-        }
-
-        void SetType(BondDataType type)
-        {
-            _type = type;
-        }
-
-        BondDataType GetType() const
-        {
-            return _type;
         }
 
         const uint32_t& GetSize() const
@@ -664,7 +652,6 @@ namespace bond
         uint16_t _id;
         Encoding _encoding;
         uint32_t _size;
-        BondDataType _type;
     };
 
 
@@ -699,10 +686,11 @@ namespace bond
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if<is_list_container<X> >::type
+    typename boost::enable_if_c<is_list_container<X>::value
+                                && is_basic_type<typename element_type<X>::type>::value>::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        detail::MatchingTypeContainer<Protocols>(var, input.GetType(), input, input.GetSize());
+        detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, input.GetSize());
     }
 
 } // namespace bond
