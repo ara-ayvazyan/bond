@@ -469,6 +469,7 @@ namespace bond
             case WireType::LengthDelimited:
                 BOOST_ASSERT(_size != 0);
                 detail::ReadStringData(_input, value, _size);
+                _size = 0;
                 break;
 
             default:

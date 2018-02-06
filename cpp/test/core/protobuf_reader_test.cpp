@@ -330,6 +330,14 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
+
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<std::string> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
