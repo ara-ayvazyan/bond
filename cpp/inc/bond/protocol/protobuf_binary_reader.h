@@ -535,6 +535,22 @@ namespace bond
             }
         }
 
+        template <typename T, typename U>
+        typename boost::enable_if<is_signed_int<T>, T>::type
+        Decode(const U& value)
+        {
+            return _encoding == Encoding::ZigZag
+                ? static_cast<T>(DecodeZigZag(value))
+                : static_cast<T>(value);
+        }
+
+        template <typename T, typename U>
+        typename boost::disable_if<is_signed_int<T>, T>::type
+        Decode(const U& value)
+        {
+            return static_cast<T>(value);
+        }
+
         template <typename T>
         typename boost::enable_if<std::is_unsigned<T> >::type
         ReadVarInt(T& value)
@@ -548,85 +564,50 @@ namespace bond
         {
             uint64_t value64;
             ReadVarInt(value64);
-            value = _encoding == Encoding::ZigZag
-                ? static_cast<T>(DecodeZigZag(value64))
-                : static_cast<T>(value64);
+            value = Decode<T>(value64);
         }
 
         void ReadVarInt(uint8_t& value)
         {
             uint16_t value16;
             ReadVarInt(value16);
-            BOOST_ASSERT(value16 <= (std::numeric_limits<uint8_t>::max)());
             value = static_cast<uint8_t>(value16);
         }
 
         template <typename T>
-        typename boost::enable_if<std::is_unsigned<T> >::type
+        typename boost::enable_if_c<(sizeof(T) == sizeof(uint32_t))>::type
         ReadFixed32(T& value)
         {
+            BOOST_STATIC_ASSERT(std::is_trivial<T>::value);
             Consume(sizeof(uint32_t));
-            uint32_t value32;
-            _input.Read(value32);
-            value = static_cast<T>(value32);
+            _input.Read(value);
         }
 
         template <typename T>
-        typename boost::enable_if<is_signed_int<T> >::type
+        typename boost::disable_if_c<(sizeof(T) == sizeof(uint32_t))>::type
         ReadFixed32(T& value)
         {
-            Consume(sizeof(uint32_t));
             uint32_t value32;
-            _input.Read(value32);
-            value = _encoding == Encoding::ZigZag
-                ? static_cast<T>(DecodeZigZag(value32))
-                : static_cast<T>(value32);
+            ReadFixed32(value32);
+            value = Decode<T>(value32);
         }
 
-        void ReadFixed32(uint32_t& value)
+        template <typename T>
+        typename boost::enable_if_c<(sizeof(T) == sizeof(uint64_t))>::type
+        ReadFixed64(T& value)
         {
-            Consume(sizeof(uint32_t));
-            _input.Read(value);
-        }
-
-        void ReadFixed32(float& value)
-        {
-            Consume(sizeof(uint32_t));
+            BOOST_STATIC_ASSERT(std::is_trivial<T>::value);
+            Consume(sizeof(uint64_t));
             _input.Read(value);
         }
 
         template <typename T>
-        typename boost::enable_if<std::is_unsigned<T> >::type
+        typename boost::disable_if_c<(sizeof(T) == sizeof(uint64_t))>::type
         ReadFixed64(T& value)
         {
-            Consume(sizeof(uint64_t));
             uint64_t value64;
-            _input.Read(value64);
-            value = static_cast<T>(value64);
-        }
-
-        template <typename T>
-        typename boost::enable_if<is_signed_int<T> >::type
-        ReadFixed64(T& value)
-        {
-            Consume(sizeof(uint64_t));
-            uint64_t value64;
-            _input.Read(value64);
-            value = _encoding == Encoding::ZigZag
-                ? static_cast<T>(DecodeZigZag(value64))
-                : static_cast<T>(value64);
-        }
-
-        void ReadFixed64(uint64_t& value)
-        {
-            Consume(sizeof(uint64_t));
-            _input.Read(value);
-        }
-
-        void ReadFixed64(double& value)
-        {
-            Consume(sizeof(uint64_t));
-            _input.Read(value);
+            ReadFixed64(value64);
+            value = Decode<T>(value64);
         }
 
         bool ReadTag()
