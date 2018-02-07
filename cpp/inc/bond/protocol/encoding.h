@@ -73,29 +73,30 @@ implements_varint_read
 
 
 template <typename Buffer, typename T> struct
-implements_varint_read<Buffer, T, typename boost::enable_if<bond::check_method<void (Buffer::*)(T&), &Buffer::ReadVariableUnsigned> >::type>
+implements_varint_read<Buffer, T, typename boost::enable_if<bond::check_method<uint8_t (Buffer::*)(T&), &Buffer::ReadVariableUnsigned> >::type>
     : std::true_type {};
 
 
 template<typename Buffer, typename T>
 inline
-typename boost::enable_if<implements_varint_read<Buffer, T> >::type
+typename boost::enable_if<implements_varint_read<Buffer, T>, uint8_t>::type
 ReadVariableUnsigned(Buffer& input, T& value)
 {
     BOOST_STATIC_ASSERT(std::is_unsigned<T>::value);
 
     // Use Buffer's implementation of ReadVariableUnsigned
-    input.ReadVariableUnsigned(value);
+    return input.ReadVariableUnsigned(value);
 }
 
 
 template<typename Buffer, typename T>
 BOND_NO_INLINE
-void GenericReadVariableUnsigned(Buffer& input, T& value)
+uint8_t GenericReadVariableUnsigned(Buffer& input, T& value)
 {
     value = 0;
     uint8_t byte;
     uint32_t shift = 0;
+    uint8_t size = 0;
 
     do
     {
@@ -104,20 +105,23 @@ void GenericReadVariableUnsigned(Buffer& input, T& value)
         T part = byte & 0x7f;
         value += part << shift;
         shift += 7;
+        ++size;
     }
     while(byte >= 0x80);
+
+    return size;
 }
 
 
 template<typename Buffer, typename T>
 inline
-typename boost::disable_if<implements_varint_read<Buffer, T> >::type
+typename boost::disable_if<implements_varint_read<Buffer, T>, uint8_t>::type
 ReadVariableUnsigned(Buffer& input, T& value)
 {
     BOOST_STATIC_ASSERT(std::is_unsigned<T>::value);
 
     // Use generic ReadVariableUnsigned
-    GenericReadVariableUnsigned(input, value);
+    return GenericReadVariableUnsigned(input, value);
 }
 
 

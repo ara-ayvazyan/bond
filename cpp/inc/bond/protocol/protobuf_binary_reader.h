@@ -6,10 +6,12 @@
 #include <bond/core/config.h>
 
 #include "detail/protobuf_utils.h"
+#include "detail/simple_array.h"
 #include <bond/core/detail/omit_default.h>
 #include <bond/core/bond_types.h>
 
 #include <boost/locale.hpp>
+#include <boost/shared_ptr.hpp>
 
 /*
     Implements Protocol Buffers binary encoding.
@@ -312,11 +314,28 @@ namespace bond
         void ReadStructBegin(bool base = false)
         {
             BOOST_VERIFY(!base);
+
+            if (_size != 0)
+            {
+                BOOST_ASSERT(_wire == WireType::LengthDelimited);
+
+                if (!_lengths)
+                {
+                    _lengths = boost::make_shared<detail::SimpleArray<uint32_t> >();
+                }
+
+                _lengths->push(_size);
+            }
         }
 
         void ReadStructEnd(bool base = false)
         {
             BOOST_VERIFY(!base);
+
+            if (_lengths && !_lengths->empty())
+            {
+                _lengths->pop(std::nothrow);
+            }
         }
 
         bool ReadFieldBegin(WireType& type, uint16_t& id)
@@ -423,7 +442,7 @@ namespace bond
             switch (_wire)
             {
             case WireType::Fixed32:
-                _input.Read(value);
+                ReadFixed32(value);
                 break;
 
             default:
@@ -439,7 +458,7 @@ namespace bond
             switch (_wire)
             {
             case WireType::Fixed64:
-                _input.Read(value);
+                ReadFixed64(value);
                 break;
 
             default:
@@ -499,11 +518,28 @@ namespace bond
         }
 
     private:
+        void Consume(uint32_t size)
+        {
+            if (_lengths && !_lengths->empty())
+            {
+                uint32_t& length = _lengths->top(std::nothrow);
+
+                if (length >= size)
+                {
+                    length -= size;
+                }
+                else
+                {
+                    BOND_THROW(CoreException, "Trying to read more than declared.");
+                }
+            }
+        }
+
         template <typename T>
         typename boost::enable_if<std::is_unsigned<T> >::type
         ReadVarInt(T& value)
         {
-            ReadVariableUnsigned(_input, value);
+            Consume(ReadVariableUnsigned(_input, value));
         }
 
         template <typename T>
@@ -529,6 +565,7 @@ namespace bond
         typename boost::enable_if<std::is_unsigned<T> >::type
         ReadFixed32(T& value)
         {
+            Consume(sizeof(uint32_t));
             uint32_t value32;
             _input.Read(value32);
             value = static_cast<T>(value32);
@@ -538,6 +575,7 @@ namespace bond
         typename boost::enable_if<is_signed_int<T> >::type
         ReadFixed32(T& value)
         {
+            Consume(sizeof(uint32_t));
             uint32_t value32;
             _input.Read(value32);
             value = _encoding == Encoding::ZigZag
@@ -547,6 +585,13 @@ namespace bond
 
         void ReadFixed32(uint32_t& value)
         {
+            Consume(sizeof(uint32_t));
+            _input.Read(value);
+        }
+
+        void ReadFixed32(float& value)
+        {
+            Consume(sizeof(uint32_t));
             _input.Read(value);
         }
 
@@ -554,6 +599,7 @@ namespace bond
         typename boost::enable_if<std::is_unsigned<T> >::type
         ReadFixed64(T& value)
         {
+            Consume(sizeof(uint64_t));
             uint64_t value64;
             _input.Read(value64);
             value = static_cast<T>(value64);
@@ -563,6 +609,7 @@ namespace bond
         typename boost::enable_if<is_signed_int<T> >::type
         ReadFixed64(T& value)
         {
+            Consume(sizeof(uint64_t));
             uint64_t value64;
             _input.Read(value64);
             value = _encoding == Encoding::ZigZag
@@ -572,15 +619,22 @@ namespace bond
 
         void ReadFixed64(uint64_t& value)
         {
+            Consume(sizeof(uint64_t));
+            _input.Read(value);
+        }
+
+        void ReadFixed64(double& value)
+        {
+            Consume(sizeof(uint64_t));
             _input.Read(value);
         }
 
         bool ReadTag()
         {
-            if (!_input.IsEof())
+            if ((!_lengths || _lengths->empty() || _lengths->top(std::nothrow) != 0) && !_input.IsEof())
             {
                 uint64_t tag;
-                ReadVariableUnsigned(_input, tag);
+                ReadVarInt(tag);
 
                 auto raw_wire = static_cast<WireType>(tag & 0x7);
                 switch (raw_wire)
@@ -628,15 +682,18 @@ namespace bond
                 break;
 
             case WireType::Fixed64:
+                Consume(sizeof(uint64_t));
                 _input.Skip(sizeof(uint64_t));
                 break;
 
             case WireType::LengthDelimited:
                 BOOST_ASSERT(_size != 0);
+                Consume(_size);
                 _input.Skip(_size);
                 break;
 
             case WireType::Fixed32:
+                Consume(sizeof(uint32_t));
                 _input.Skip(sizeof(uint32_t));
                 break;
 
@@ -652,6 +709,7 @@ namespace bond
         uint16_t _id;
         Encoding _encoding;
         uint32_t _size;
+        boost::shared_ptr<detail::SimpleArray<uint32_t> > _lengths;
     };
 
 
@@ -681,15 +739,24 @@ namespace bond
             typename element_type<X>::type item = make_element(var);
             element.template Deserialize<Protocols>(item);
             list_append(var, item);
-
-        } while (size != 0);
+        }
+        while (size != 0);
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if<is_list_container<X> >::type
+    typename boost::enable_if_c<is_list_container<X>::value
+                                && is_basic_type<typename element_type<X>::type>::value>::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, input.GetSize());
+    }
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::enable_if_c<is_list_container<X>::value
+                                && is_bond_type<typename element_type<X>::type>::value>::type
+    inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
+    {
+        DeserializeElements<Protocols>(var, element, input.GetSize());
     }
 
 } // namespace bond

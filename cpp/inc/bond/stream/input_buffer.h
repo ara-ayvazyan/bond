@@ -212,17 +212,19 @@ public:
 
 
     template <typename T>
-    void ReadVariableUnsigned(T& value)
+    uint8_t ReadVariableUnsigned(T& value)
     {
         if (_blob.length() > _pointer + sizeof(T) * 8 / 7)
         {
-            const char* ptr = _blob.content() + _pointer;
-            input_buffer::VariableUnsignedUnchecked<T, 0>::Read(ptr, value);
-            _pointer = static_cast<uint32_t>(ptr - _blob.content());
+            const char* const ptr = _blob.content() + _pointer;
+            auto p = ptr;
+            input_buffer::VariableUnsignedUnchecked<T, 0>::Read(p, value);
+            _pointer = static_cast<uint32_t>(p - _blob.content());
+            return static_cast<uint8_t>(p - ptr);
         }
         else
         {
-            GenericReadVariableUnsigned(*this, value);
+            return GenericReadVariableUnsigned(*this, value);
         }
     }
 

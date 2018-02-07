@@ -338,6 +338,10 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StringContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StructContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
