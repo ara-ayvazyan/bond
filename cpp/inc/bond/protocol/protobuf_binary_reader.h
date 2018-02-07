@@ -678,10 +678,19 @@ namespace bond
 
 
     template <typename T>
-    inline void list_append(T& list, const typename element_type<T>::type& item)
+    typename boost::enable_if<is_list_container<T> >::type
+    inline container_append(T& list, const typename element_type<T>::type& item)
     {
         list.push_back(item);
     }
+
+    template <typename T>
+    typename boost::enable_if<is_set_container<T> >::type
+    inline container_append(T& set, const typename element_type<T>::type& item)
+    {
+        set_insert(set, item);
+    }
+
 
     namespace detail
     {
@@ -695,20 +704,21 @@ namespace bond
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if<is_list_container<X> >::type
+    typename boost::enable_if_c<is_container<X>::value && !is_map_container<X>::value>::type
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, const uint32_t& size)
     {
         do
         {
             typename element_type<X>::type item = make_element(var);
             element.template Deserialize<Protocols>(item);
-            list_append(var, item);
+            container_append(var, item);
         }
         while (size != 0);
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_list_container<X>::value
+    typename boost::enable_if_c<is_container<X>::value
+                                && !is_map_container<X>::value
                                 && is_basic_type<typename element_type<X>::type>::value>::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
@@ -716,7 +726,8 @@ namespace bond
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_list_container<X>::value
+    typename boost::enable_if_c<is_container<X>::value
+                                && !is_map_container<X>::value
                                 && !is_basic_type<typename element_type<X>::type>::value>::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {

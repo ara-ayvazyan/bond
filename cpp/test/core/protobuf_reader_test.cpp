@@ -327,7 +327,6 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
 
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::string> >();
-
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::wstring> >();
 
     CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::blob> >();
@@ -337,16 +336,24 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
     CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
-
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
+
+    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersSetContainer>();
+    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersSetContainer>();
 
     CheckBinaryFormat<
         unittest::proto::StringContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<std::string> > >();
-
     CheckBinaryFormat<
         unittest::proto::StringContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::set<std::string> > >();
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::set<std::wstring> > >();
 
     CheckBinaryFormat<
         unittest::proto::BlobContainer,
