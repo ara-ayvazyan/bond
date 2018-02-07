@@ -20,6 +20,50 @@
 
 namespace bond
 {
+    namespace detail
+    {
+    namespace proto
+    {
+        template <typename Schema>
+        class FieldEnumerator;
+
+        template <>
+        class FieldEnumerator<RuntimeSchema>
+        {
+        public:
+            explicit FieldEnumerator(const RuntimeSchema& schema)
+                : _begin{ schema.GetStruct().fields.begin() },
+                  _end{ schema.GetStruct().fields.end() },
+                  _it{ _begin }
+            {}
+
+            const FieldDef* find(uint16_t id)
+            {
+                if (_it == _end
+                    || (_it->id != id && (++_it == _end || _it->id != id)))
+                {
+                    _it = std::lower_bound(_begin, _end, id,
+                        [](const FieldDef& f, uint16_t id) { return f.id < id; });
+                }
+
+                return _it != _end && _it->id == id ? &*_it : nullptr;
+            }
+
+        private:
+            const std::vector<FieldDef>::const_iterator _begin;
+            const std::vector<FieldDef>::const_iterator _end;
+            std::vector<FieldDef>::const_iterator _it;
+        };
+
+        template <typename Schema>
+        FieldEnumerator<Schema> EnumerateFields(const Schema& schema)
+        {
+            return FieldEnumerator<Schema>{ schema };
+        }
+
+    } // namespace proto
+    } // namespace detail
+
     template <typename Input>
     class ProtobufParser
     {
@@ -166,52 +210,38 @@ namespace bond
         template <typename Transform>
         bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
         {
-            const auto& fields = schema.GetStruct().fields;
-
             WireType type;
             uint16_t id;
 
-            for (auto it = fields.begin(); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
+            for (auto fields = detail::proto::EnumerateFields(schema); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
             {
-                if (it == fields.end()
-                    || (it->id != id && (++it == fields.end() || it->id != id)))
+                if (const FieldDef* field = fields.find(id))
                 {
-                    it = std::lower_bound(
-                        fields.begin(),
-                        fields.end(),
-                        id,
-                        [](const FieldDef& f, uint16_t id) { return f.id < id; });
-                }
-
-                if (it != fields.end())
-                {
-                    const FieldDef& field = *it;
-
-                    if (field.type.id == BT_STRUCT)
+                    if (field->type.id == BT_STRUCT)
                     {
                         switch (type)
                         {
                         case WireType::LengthDelimited:
-                            transform.Field(id, field.metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, field } });
+                            transform.Field(id, field->metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                             continue;
                         }
                     }
-                    else if (field.type.id == BT_LIST || field.type.id == BT_SET)
+                    else if (field->type.id == BT_LIST || field->type.id == BT_SET)
                     {
-                        BOOST_ASSERT(field.type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadEncoding(field.type.element->id, field.metadata));
-                        transform.Field(id, field.metadata, value<void, Input>{ _input, RuntimeSchema{ schema, field } });
+                        BOOST_ASSERT(field->type.element.hasvalue());
+                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, field->metadata));
+                        transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                         continue;
                     }
-                    else if (field.type.id == BT_MAP)
+                    else if (field->type.id == BT_MAP)
                     {
                         BOOST_ASSERT(false); // Not implemented
                     }
                     else
                     {
-                        _input.SetEncoding(detail::proto::ReadEncoding(field.type.id, field.metadata));
+                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.id, field->metadata));
 
-                        if (detail::BasicTypeField(id, field.metadata, field.type.id, BindWireTypeField(type, transform), _input))
+                        if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, transform), _input))
                         {
                             continue;
                         }
