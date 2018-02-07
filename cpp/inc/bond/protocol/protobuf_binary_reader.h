@@ -493,36 +493,6 @@ namespace bond
             Skip();
         }
 
-        void Skip()
-        {
-            switch (_wire)
-            {
-            case WireType::VarInt:
-            {
-                uint64_t value;
-                ReadVarInt(value);
-            }
-            break;
-
-            case WireType::Fixed64:
-                _input.Skip(sizeof(uint64_t));
-                break;
-
-            case WireType::LengthDelimited:
-                BOOST_ASSERT(_size != 0);
-                _input.Skip(_size);
-                break;
-
-            case WireType::Fixed32:
-                _input.Skip(sizeof(uint32_t));
-                break;
-
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
-        }
-
         bool operator==(const ProtobufBinaryReader& rhs) const
         {
             return _input == rhs._input;
@@ -646,6 +616,36 @@ namespace bond
             return false;
         }
 
+        void Skip()
+        {
+            switch (_wire)
+            {
+            case WireType::VarInt:
+                {
+                    uint64_t value;
+                    ReadVarInt(value);
+                }
+                break;
+
+            case WireType::Fixed64:
+                _input.Skip(sizeof(uint64_t));
+                break;
+
+            case WireType::LengthDelimited:
+                BOOST_ASSERT(_size != 0);
+                _input.Skip(_size);
+                break;
+
+            case WireType::Fixed32:
+                _input.Skip(sizeof(uint32_t));
+                break;
+
+            default:
+                BOOST_ASSERT(false);
+                break;
+            }
+        }
+
 
         Buffer _input;
         WireType _wire;
@@ -664,9 +664,9 @@ namespace bond
     namespace detail
     {
         template <typename Buffer>
-        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& input, uint32_t /*size*/)
+        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& /*input*/, uint32_t /*size*/)
         {
-            input.Skip();
+            BOOST_ASSERT(false);
         }
 
     } // namespace detail
@@ -686,8 +686,7 @@ namespace bond
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_list_container<X>::value
-                                && is_basic_type<typename element_type<X>::type>::value>::type
+    typename boost::enable_if<is_list_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, input.GetSize());
