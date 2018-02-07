@@ -248,7 +248,7 @@ namespace bond
 
         explicit ProtobufBinaryReader(const Buffer& input)
             : _input{ input },
-              _wire{ detail::proto::Unavailable<WireType>() },
+              _type{ detail::proto::Unavailable<WireType>() },
               _id{ 0 },
               _encoding{ detail::proto::Unavailable<Encoding>() },
               _size{ 0 }
@@ -256,11 +256,14 @@ namespace bond
 
         void ReadStructBegin(bool base = false)
         {
-            BOOST_VERIFY(!base);
+            if (base)
+            {
+                detail::proto::NotSupportedException("Inheritance");
+            }
 
             if (_size != 0)
             {
-                BOOST_ASSERT(_wire == WireType::LengthDelimited);
+                BOOST_ASSERT(_type == WireType::LengthDelimited);
 
                 if (!_lengths)
                 {
@@ -285,7 +288,7 @@ namespace bond
         {
             if (ReadTag())
             {
-                type = _wire;
+                type = _type;
                 id = _id;
                 return true;
             }
@@ -306,24 +309,11 @@ namespace bond
         void ReadFieldEnd()
         {}
 
-        void ReadContainerBegin(uint32_t& /*size*/, BondDataType& /*type*/)
-        {
-            // TODO:
-        }
-
-        void ReadContainerBegin(uint32_t& /*size*/, std::pair<BondDataType, BondDataType>& /*type*/)
-        {
-            // TODO:
-        }
-
-        void ReadContainerEnd()
-        {}
-
         void Read(bool& value)
         {
             BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_wire)
+            switch (_type)
             {
             case WireType::VarInt:
                 ReadVarInt(value);
@@ -347,7 +337,7 @@ namespace bond
             BOOST_STATIC_ASSERT(sizeof(T) <= sizeof(uint64_t));
             //BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_wire)
+            switch (_type)
             {
             case WireType::VarInt:
                 ReadVarInt(value);
@@ -399,7 +389,7 @@ namespace bond
         {
             //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
-            switch (_wire)
+            switch (_type)
             {
             case WireType::Fixed32:
                 ReadFixed32(value);
@@ -423,7 +413,7 @@ namespace bond
         typename boost::enable_if<is_string<T> >::type
         Read(T& value)
         {
-            switch (_wire)
+            switch (_type)
             {
             case WireType::LengthDelimited:
                 BOOST_ASSERT(_size != 0);
@@ -449,7 +439,7 @@ namespace bond
 
         void Read(blob& value)
         {
-            BOOST_ASSERT(_wire == WireType::LengthDelimited);
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
 
             if (_size != 0)
             {
@@ -468,7 +458,7 @@ namespace bond
         template <typename T>
         void Skip(const bonded<T, ProtobufBinaryReader&>&)
         {
-            BOOST_ASSERT(_wire == WireType::LengthDelimited);
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
             Skip();
         }
 
@@ -502,7 +492,7 @@ namespace bond
 
         void ConsumePacked(uint32_t size)
         {
-            BOOST_ASSERT(_wire == WireType::LengthDelimited);
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
             BOOST_ASSERT(_size != 0);
             BOOST_ASSERT(_size >= size);
             _size -= size;
@@ -610,8 +600,8 @@ namespace bond
                 uint64_t tag;
                 ReadVarInt(tag);
 
-                auto raw_wire = static_cast<WireType>(tag & 0x7);
-                switch (raw_wire)
+                auto raw_type = static_cast<WireType>(tag & 0x7);
+                switch (raw_type)
                 {
                 case WireType::VarInt:
                 case WireType::Fixed32:
@@ -634,7 +624,7 @@ namespace bond
                     BOND_THROW(CoreException, "Field ordinal does not fit in 16 bits.");
                 }
 
-                _wire = static_cast<WireType>(raw_wire);
+                _type = static_cast<WireType>(raw_type);
                 _id = static_cast<uint16_t>(raw_id);
                 _encoding = detail::proto::Unavailable<Encoding>();
 
@@ -646,7 +636,7 @@ namespace bond
 
         void Skip()
         {
-            switch (_wire)
+            switch (_type)
             {
             case WireType::VarInt:
                 {
@@ -679,7 +669,7 @@ namespace bond
 
 
         Buffer _input;
-        WireType _wire;
+        WireType _type;
         uint16_t _id;
         Encoding _encoding;
         uint32_t _size;
