@@ -383,21 +383,11 @@ namespace bond
             switch (_wire)
             {
             case WireType::VarInt:
-                {
-                    uint8_t value8;
-                    ReadVarInt(value8);
-                    BOOST_ASSERT(value8 == 0 || value8 == 1);
-                    value = (value8 == 1);
-                }
+                ReadVarInt(value);
                 break;
 
             case WireType::LengthDelimited:
-                {
-                    uint8_t value8;
-                    ReadVarIntPacked(value8);
-                    BOOST_ASSERT(value8 == 0 || value8 == 1);
-                    value = (value8 == 1);
-                }
+                ReadVarIntPacked(value);
                 break;
 
             default:
@@ -579,7 +569,8 @@ namespace bond
         }
 
         template <typename T>
-        typename boost::enable_if<std::is_unsigned<T>, uint32_t>::type
+        typename boost::enable_if_c<std::is_unsigned<T>::value
+                                    && (sizeof(T) > sizeof(uint8_t)), uint32_t>::type
         ReadVarInt(T& value)
         {
             uint32_t size = ReadVariableUnsigned(_input, value);
@@ -588,20 +579,13 @@ namespace bond
         }
 
         template <typename T>
-        typename boost::enable_if<is_signed_int<T>, uint32_t>::type
+        typename boost::disable_if_c<std::is_unsigned<T>::value
+                                    && (sizeof(T) > sizeof(uint8_t)), uint32_t>::type
         ReadVarInt(T& value)
         {
-            uint64_t value64;
-            uint32_t size = ReadVarInt(value64);
-            value = Decode<T>(value64);
-            return size;
-        }
-
-        uint32_t ReadVarInt(uint8_t& value)
-        {
-            uint16_t value16;
-            uint32_t size = ReadVarInt(value16);
-            value = static_cast<uint8_t>(value16);
+            typename std::conditional<is_signed_int<T>::value, uint64_t, uint16_t>::type value16or64;
+            uint32_t size = ReadVarInt(value16or64);
+            value = Decode<T>(value16or64);
             return size;
         }
 
