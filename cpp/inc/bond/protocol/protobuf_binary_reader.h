@@ -460,7 +460,9 @@ namespace bond
             value = static_cast<T>(raw);
         }
 
-        void Read(float& value)
+        template <typename T>
+        typename boost::enable_if<std::is_floating_point<T> >::type
+        Read(T& value)
         {
             //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
 
@@ -470,22 +472,6 @@ namespace bond
                 ReadFixed32(value);
                 break;
 
-            case WireType::LengthDelimited:
-                ReadFixedPacked(value);
-                break;
-
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
-        }
-
-        void Read(double& value)
-        {
-            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
-
-            switch (_wire)
-            {
             case WireType::Fixed64:
                 ReadFixed64(value);
                 break;
@@ -638,7 +624,7 @@ namespace bond
         typename boost::disable_if_c<(sizeof(T) == sizeof(uint32_t))>::type
         ReadFixed32(T& value)
         {
-            uint32_t value32;
+            typename std::conditional<std::is_floating_point<T>::value, float, uint32_t>::type value32;
             ReadFixed32(value32);
             value = Decode<T>(value32);
         }
@@ -656,7 +642,7 @@ namespace bond
         typename boost::disable_if_c<(sizeof(T) == sizeof(uint64_t))>::type
         ReadFixed64(T& value)
         {
-            uint64_t value64;
+            typename std::conditional<std::is_floating_point<T>::value, double, uint64_t>::type value64;
             ReadFixed64(value64);
             value = Decode<T>(value64);
         }
