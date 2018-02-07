@@ -325,6 +325,8 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
 
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::wstring> >();
 
+    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::blob> >();
+
     CheckBinaryFormat<
         unittest::proto::NestedStruct,
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();

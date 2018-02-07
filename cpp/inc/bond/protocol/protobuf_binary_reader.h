@@ -485,6 +485,7 @@ namespace bond
             case WireType::LengthDelimited:
                 BOOST_ASSERT(_size != 0);
                 detail::ReadStringData(_input, value, _size);
+                Consume(_size);
                 _size = 0;
                 break;
 
@@ -501,6 +502,15 @@ namespace bond
             std::string str;
             Read(str);
             value = boost::locale::conv::utf_to_utf<typename element_type<T>::type>(str);
+        }
+
+        void Read(blob& value)
+        {
+            BOOST_ASSERT(_wire == WireType::LengthDelimited);
+            BOOST_ASSERT(_size != 0);
+            _input.Read(value, _size);
+            Consume(_size);
+            _size = 0;
         }
 
         template <typename T>
@@ -775,6 +785,12 @@ namespace bond
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         DeserializeElements<Protocols>(var, element, input.GetSize());
+    }
+
+    template <typename Protocols, typename T, typename Buffer>
+    inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
+    {
+        input.Read(var);
     }
 
 } // namespace bond
