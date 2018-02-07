@@ -507,10 +507,13 @@ namespace bond
         void Read(blob& value)
         {
             BOOST_ASSERT(_wire == WireType::LengthDelimited);
-            BOOST_ASSERT(_size != 0);
-            _input.Read(value, _size);
-            Consume(_size);
-            _size = 0;
+
+            if (_size != 0)
+            {
+                _input.Read(value, _size);
+                Consume(_size);
+                _size = 0;
+            }
         }
 
         template <typename T>
@@ -781,7 +784,7 @@ namespace bond
 
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if_c<is_list_container<X>::value
-                                && is_bond_type<typename element_type<X>::type>::value>::type
+                                && !is_basic_type<typename element_type<X>::type>::value>::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         DeserializeElements<Protocols>(var, element, input.GetSize());

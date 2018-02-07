@@ -303,9 +303,8 @@ namespace
 BOOST_AUTO_TEST_SUITE(ProtobufReaderTests)
 
 template <typename Proto, typename Bond>
-void CheckBinaryFormat()
+void CheckBinaryFormat(const Bond& bond_struct)
 {
-    auto bond_struct = InitRandom<Bond>();
     Proto proto_struct;
     bond::Apply(ToProto{ proto_struct }, bond_struct);
 
@@ -315,6 +314,12 @@ void CheckBinaryFormat()
     bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
     auto bond_struct2 = bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
     BOOST_CHECK((bond_struct == bond_struct2));
+}
+
+template <typename Proto, typename Bond>
+void CheckBinaryFormat()
+{
+    CheckBinaryFormat<Proto>(InitRandom<Bond>());
 }
 
 BOOST_AUTO_TEST_CASE(ExperimentTest)
@@ -342,6 +347,14 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StringContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::BlobContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > >();
+
+    unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > box;
+    box.value.resize(2, bond::blob{});
+    CheckBinaryFormat<unittest::proto::BlobContainer>(box);
 
     CheckBinaryFormat<
         unittest::proto::StructContainer,
