@@ -77,14 +77,104 @@ namespace bond
         }
 
         template <typename Transform>
+        class WireTypeFieldBinder
+        {
+        public:
+            WireTypeFieldBinder(WireType type, const Transform& transform)
+                : _type{ type },
+                  _transform{ transform }
+            {}
+
+            template <typename Input>
+            bool Field(uint16_t id, const Metadata& metadata, const value<bool, Input>& value) const
+            {
+                switch (_type)
+                {
+                case WireType::VarInt:
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+            template <typename T, typename Input>
+            typename boost::enable_if_c<std::is_arithmetic<T>::value
+                                    && !std::is_floating_point<T>::value, bool>::type
+            Field(uint16_t id, const Metadata& metadata, const value<T, Input>& value) const
+            {
+                switch (_type)
+                {
+                case WireType::VarInt:
+                case WireType::Fixed32:
+                case WireType::Fixed64:
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+            template <typename Input>
+            bool Field(uint16_t id, const Metadata& metadata, const value<float, Input>& value) const
+            {
+                switch (_type)
+                {
+                case WireType::Fixed32:
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+            template <typename Input>
+            bool Field(uint16_t id, const Metadata& metadata, const value<double, Input>& value) const
+            {
+                switch (_type)
+                {
+                case WireType::Fixed64:
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+            template <typename T, typename Input>
+            typename boost::enable_if<is_string_type<T>, bool>::type
+            Field(uint16_t id, const Metadata& metadata, const value<T, Input>& value) const
+            {
+                switch (_type)
+                {
+                case WireType::LengthDelimited:
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+        private:
+            WireType _type;
+            const Transform& _transform;
+        };
+
+        template <typename Transform>
+        WireTypeFieldBinder<Transform> BindWireTypeField(WireType type, const Transform& transform)
+        {
+            return WireTypeFieldBinder<Transform>{ type, transform };
+        }
+
+        template <typename Transform>
         bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
         {
             const auto& fields = schema.GetStruct().fields;
 
-            WireType wire_type;
+            WireType type;
             uint16_t id;
 
-            for (auto it = fields.begin(); _input.ReadFieldBegin(wire_type, id); _input.ReadFieldEnd())
+            for (auto it = fields.begin(); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
             {
                 if (it == fields.end()
                     || (it->id != id && (++it == fields.end() || it->id != id)))
@@ -96,186 +186,42 @@ namespace bond
                         [](const FieldDef& f, uint16_t id) { return f.id < id; });
                 }
 
-                BondDataType type;
-
                 if (it != fields.end())
                 {
-                    switch (type = it->type.id)
+                    const FieldDef& field = *it;
+
+                    if (field.type.id == BT_STRUCT)
                     {
-                    case BT_BOOL:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                            transform.Field(id, it->metadata, value<bool, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_UINT8:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<uint8_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_UINT16:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<uint16_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_UINT32:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<uint32_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_UINT64:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<uint64_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_FLOAT:
-                        switch (wire_type)
-                        {
-                        case WireType::Fixed32:
-                            transform.Field(id, it->metadata, value<float, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_DOUBLE:
-                        switch (wire_type)
-                        {
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<double, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_STRING:
-                        switch (wire_type)
+                        switch (type)
                         {
                         case WireType::LengthDelimited:
-                            transform.Field(id, it->metadata, value<std::string, Input&>(_input));
+                            transform.Field(id, field.metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, field } });
                             continue;
                         }
-                        break;
-
-                    case BT_WSTRING:
-                        switch (wire_type)
-                        {
-                        case WireType::LengthDelimited:
-                            transform.Field(id, it->metadata, value<std::wstring, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_INT8:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                            _input.SetEncoding(detail::proto::ReadEncoding(BT_INT8, it->metadata));
-                            // fall-through
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<int8_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_INT16:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                            _input.SetEncoding(detail::proto::ReadEncoding(BT_INT16, it->metadata));
-                            // fall-through
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<int16_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_INT32:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                            _input.SetEncoding(detail::proto::ReadEncoding(BT_INT32, it->metadata));
-                            // fall-through
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<int32_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_INT64:
-                        switch (wire_type)
-                        {
-                        case WireType::VarInt:
-                            _input.SetEncoding(detail::proto::ReadEncoding(BT_INT64, it->metadata));
-                            // fall-through
-                        case WireType::Fixed32:
-                        case WireType::Fixed64:
-                            transform.Field(id, it->metadata, value<int64_t, Input&>(_input));
-                            continue;
-                        }
-                        break;
-
-                    case BT_STRUCT:
-                        switch (wire_type)
-                        {
-                        case WireType::LengthDelimited:
-                            transform.Field(id, it->metadata, bonded<void, Input>(_input, RuntimeSchema{ schema, *it }));
-                            continue;
-                        }
-                        break;
-
-                    case BT_LIST:
-                    case BT_SET:
-                        BOOST_ASSERT(it->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadEncoding(it->type.element->id, it->metadata));
-                        transform.Field(id, it->metadata, value<void, Input>(_input, RuntimeSchema{ schema, *it }));
+                    }
+                    else if (field.type.id == BT_LIST || field.type.id == BT_SET)
+                    {
+                        BOOST_ASSERT(field.type.element.hasvalue());
+                        _input.SetEncoding(detail::proto::ReadEncoding(field.type.element->id, field.metadata));
+                        transform.Field(id, field.metadata, value<void, Input>{ _input, RuntimeSchema{ schema, field } });
                         continue;
-
-                    case BT_MAP:
-                        // TODO:
+                    }
+                    else if (field.type.id == BT_MAP)
+                    {
                         BOOST_ASSERT(false); // Not implemented
-                        //transform.Field(id, it->metadata, value<void, Input>(_input, RuntimeSchema{ schema, *it }));
-                        break;
+                    }
+                    else
+                    {
+                        _input.SetEncoding(detail::proto::ReadEncoding(field.type.id, field.metadata));
 
-                    default:
-                        BOOST_ASSERT(false);
-                        break;
+                        if (detail::BasicTypeField(id, field.metadata, field.type.id, BindWireTypeField(type, transform), _input))
+                        {
+                            continue;
+                        }
                     }
                 }
-                else
-                {
-                    type = BT_UNAVAILABLE;
-                }
 
-                transform.UnknownField(id, value<void, Input>(_input, type));
+                transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
             }
 
             _input.ReadFieldEnd();
