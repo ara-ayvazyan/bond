@@ -391,6 +391,15 @@ namespace bond
                 }
                 break;
 
+            case WireType::LengthDelimited:
+                {
+                    uint8_t value8;
+                    ReadVarIntPacked(value8);
+                    BOOST_ASSERT(value8 == 0 || value8 == 1);
+                    value = (value8 == 1);
+                }
+                break;
+
             default:
                 BOOST_ASSERT(false);
                 break;
@@ -419,6 +428,22 @@ namespace bond
                 ReadFixed64(value);
                 break;
 
+            case WireType::LengthDelimited:
+                switch (_encoding)
+                {
+                case Encoding::Fixed:
+                    ReadFixedPacked(value);
+                    break;
+
+                case Encoding::ZigZag:
+                    BOOST_ASSERT(is_signed_int<T>::value);
+                    // fall-through
+                default:
+                    ReadVarIntPacked(value);
+                    break;
+                }
+                break;
+
             default:
                 BOOST_ASSERT(false);
                 break;
@@ -445,6 +470,10 @@ namespace bond
                 ReadFixed32(value);
                 break;
 
+            case WireType::LengthDelimited:
+                ReadFixedPacked(value);
+                break;
+
             default:
                 BOOST_ASSERT(false);
                 break;
@@ -459,6 +488,10 @@ namespace bond
             {
             case WireType::Fixed64:
                 ReadFixed64(value);
+                break;
+
+            case WireType::LengthDelimited:
+                ReadFixedPacked(value);
                 break;
 
             default:
@@ -535,6 +568,14 @@ namespace bond
             }
         }
 
+        void ConsumePacked(uint32_t size)
+        {
+            BOOST_ASSERT(_wire == WireType::LengthDelimited);
+            BOOST_ASSERT(_size != 0);
+            BOOST_ASSERT(_size >= size);
+            _size -= size;
+        }
+
         template <typename T, typename U>
         typename boost::enable_if<is_signed_int<T>, T>::type
         Decode(const U& value)
@@ -552,26 +593,36 @@ namespace bond
         }
 
         template <typename T>
-        typename boost::enable_if<std::is_unsigned<T> >::type
+        typename boost::enable_if<std::is_unsigned<T>, uint32_t>::type
         ReadVarInt(T& value)
         {
-            Consume(ReadVariableUnsigned(_input, value));
+            uint32_t size = ReadVariableUnsigned(_input, value);
+            Consume(size);
+            return size;
         }
 
         template <typename T>
-        typename boost::enable_if<is_signed_int<T> >::type
+        typename boost::enable_if<is_signed_int<T>, uint32_t>::type
         ReadVarInt(T& value)
         {
             uint64_t value64;
-            ReadVarInt(value64);
+            uint32_t size = ReadVarInt(value64);
             value = Decode<T>(value64);
+            return size;
         }
 
-        void ReadVarInt(uint8_t& value)
+        uint32_t ReadVarInt(uint8_t& value)
         {
             uint16_t value16;
-            ReadVarInt(value16);
+            uint32_t size = ReadVarInt(value16);
             value = static_cast<uint8_t>(value16);
+            return size;
+        }
+
+        template <typename T>
+        void ReadVarIntPacked(T& value)
+        {
+            ConsumePacked(ReadVarInt(value));
         }
 
         template <typename T>
@@ -579,8 +630,8 @@ namespace bond
         ReadFixed32(T& value)
         {
             BOOST_STATIC_ASSERT(std::is_trivial<T>::value);
-            Consume(sizeof(uint32_t));
             _input.Read(value);
+            Consume(sizeof(uint32_t));
         }
 
         template <typename T>
@@ -597,8 +648,8 @@ namespace bond
         ReadFixed64(T& value)
         {
             BOOST_STATIC_ASSERT(std::is_trivial<T>::value);
-            Consume(sizeof(uint64_t));
             _input.Read(value);
+            Consume(sizeof(uint64_t));
         }
 
         template <typename T>
@@ -608,6 +659,22 @@ namespace bond
             uint64_t value64;
             ReadFixed64(value64);
             value = Decode<T>(value64);
+        }
+
+        template <typename T>
+        typename boost::enable_if_c<(sizeof(T) <= sizeof(uint32_t))>::type
+        ReadFixedPacked(T& value)
+        {
+            ReadFixed32(value);
+            ConsumePacked(sizeof(uint32_t));
+        }
+
+        template <typename T>
+        typename boost::enable_if_c<(sizeof(T) == sizeof(uint64_t))>::type
+        ReadFixedPacked(T& value)
+        {
+            ReadFixed64(value);
+            ConsumePacked(sizeof(uint64_t));
         }
 
         bool ReadTag()
@@ -663,19 +730,19 @@ namespace bond
                 break;
 
             case WireType::Fixed64:
-                Consume(sizeof(uint64_t));
                 _input.Skip(sizeof(uint64_t));
+                Consume(sizeof(uint64_t));
                 break;
 
             case WireType::LengthDelimited:
                 BOOST_ASSERT(_size != 0);
-                Consume(_size);
                 _input.Skip(_size);
+                Consume(_size);
                 break;
 
             case WireType::Fixed32:
-                Consume(sizeof(uint32_t));
                 _input.Skip(sizeof(uint32_t));
+                Consume(sizeof(uint32_t));
                 break;
 
             default:

@@ -329,6 +329,8 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
         unittest::proto::NestedStruct,
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
+    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
+
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
 
     CheckBinaryFormat<
