@@ -221,147 +221,147 @@ inline void SkipElements(BondDataType type, Reader& input, uint32_t size)
 
 // MatchingTypeContainer function are manually expended versions of BasicTypeContainer
 // using the type information about destination container. This helps with compilation speed.
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<is_type_alias<typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     if (type == get_type_id<typename element_type<T>::type>::value)
     {
-        DeserializeElements<Protocols>(var, value<typename element_type<T>::type, Reader&>(input, false), std::forward<Size>(size));
+        DeserializeElements<Protocols>(var, value<typename element_type<T>::type, Reader&>(input, false), size);
     }
     else
     {
         BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-        SkipElements(type, input, std::forward<Size>(size));
+        SkipElements(type, input, size);
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<std::is_same<bool, typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_BOOL:
-            return DeserializeElements<Protocols>(var, value<bool, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<bool, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<is_string<typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_STRING:
-            return DeserializeElements<Protocols>(var, value<std::string, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<std::string, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<is_wstring<typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_WSTRING:
-            return DeserializeElements<Protocols>(var, value<std::wstring, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<std::wstring, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<std::is_floating_point<typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_FLOAT:
-            return DeserializeElements<Protocols>(var, value<float, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<float, Reader&>(input, false), size);
 
         case bond::BT_DOUBLE:
-            return DeserializeElements<Protocols>(var, value<double, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<double, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<is_matching<uint8_t, typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_UINT8:
-            return DeserializeElements<Protocols>(var, value<uint8_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<uint8_t, Reader&>(input, false), size);
 
         case bond::BT_UINT16:
-            return DeserializeElements<Protocols>(var, value<uint16_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<uint16_t, Reader&>(input, false), size);
 
         case bond::BT_UINT32:
-            return DeserializeElements<Protocols>(var, value<uint32_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<uint32_t, Reader&>(input, false), size);
 
         case bond::BT_UINT64:
-            return DeserializeElements<Protocols>(var, value<uint64_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<uint64_t, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }
 
 
-template <typename Protocols, typename T, typename Reader, typename Size>
+template <typename Protocols, typename T, typename Reader>
 typename boost::enable_if<is_matching<int8_t, typename element_type<T>::type> >::type
-inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, Size&& size)
+inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t size)
 {
     switch (type)
     {
         case bond::BT_INT8:
-            return DeserializeElements<Protocols>(var, value<int8_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<int8_t, Reader&>(input, false), size);
 
         case bond::BT_INT16:
-            return DeserializeElements<Protocols>(var, value<int16_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<int16_t, Reader&>(input, false), size);
 
         case bond::BT_INT32:
-            return DeserializeElements<Protocols>(var, value<int32_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<int32_t, Reader&>(input, false), size);
 
         case bond::BT_INT64:
-            return DeserializeElements<Protocols>(var, value<int64_t, Reader&>(input, false), std::forward<Size>(size));
+            return DeserializeElements<Protocols>(var, value<int64_t, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
 
-            SkipElements(type, input, std::forward<Size>(size));
+            SkipElements(type, input, size);
             break;
     }
 }

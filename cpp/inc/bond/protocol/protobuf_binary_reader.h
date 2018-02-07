@@ -235,7 +235,11 @@ namespace bond
                     }
                     else if (field->type.id == BT_MAP)
                     {
-                        BOOST_ASSERT(false); // Not implemented
+                        BOOST_ASSERT(field->type.key.hasvalue());
+                        BOOST_ASSERT(field->type.element.hasvalue());
+                        _input.SetEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, field->metadata));
+                        transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
+                        continue;
                     }
                     else
                     {
@@ -730,44 +734,116 @@ namespace bond
             BOOST_ASSERT(false);
         }
 
+        template <typename T, typename Buffer>
+        inline void SkipElements(
+            BondDataType /*keyType*/,
+            BondDataType /*elementType*/,
+            ProtobufBinaryReader<Buffer>& /*input*/,
+            uint32_t /*size*/)
+        {
+            BOOST_ASSERT(false);
+        }
+
+        template <typename T, typename Buffer>
+        inline void SkipElements(
+            BondDataType /*keyType*/,
+            const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
+            ProtobufBinaryReader<Buffer>& /*input*/,
+            uint32_t /*size*/)
+        {
+            BOOST_ASSERT(false);
+        }
+
     } // namespace detail
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if_c<is_container<X>::value && !is_map_container<X>::value>::type
-    inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, const uint32_t& size)
+    inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
+        BOOST_VERIFY(size == 0);
+
         do
         {
             typename element_type<X>::type item = make_element(var);
             element.template Deserialize<Protocols>(item);
             container_append(var, item);
         }
-        while (size != 0);
+        while (element.GetInput().GetSize() != 0);
+    }
+
+    template <typename Protocols, typename Transform, typename T, typename Buffer>
+    inline void DeserializeElements(
+        const Transform& /*transform*/,
+        const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
+        uint32_t /*size*/)
+    {
+        BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_container<X>::value
-                                && !is_map_container<X>::value
-                                && is_basic_type<typename element_type<X>::type>::value>::type
+    typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, input.GetSize());
+        detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, 0);
     }
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_container<X>::value
-                                && !is_map_container<X>::value
-                                && !is_basic_type<typename element_type<X>::type>::value>::type
+    typename boost::disable_if<is_basic_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        DeserializeElements<Protocols>(var, element, input.GetSize());
+        DeserializeElements<Protocols>(var, element, 0);
     }
 
     template <typename Protocols, typename T, typename Buffer>
     inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
     {
         input.Read(var);
+    }
+
+    inline const char* GetTypeName(const decltype(std::ignore)&, const qualified_name_tag&)
+    {
+        return "Ignore";
+    }
+
+    template <typename Protocols, typename X, typename Key, typename T, typename Buffer>
+    inline void DeserializeMapElements(
+        X& var,
+        const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
+        const value<T, ProtobufBinaryReader<Buffer>&>& element,
+        uint32_t size)
+    {
+        BOOST_VERIFY(size == 0);
+
+        typename element_type<X>::type::first_type k = make_key(var);
+        typename element_type<X>::type::second_type v = make_value(var);
+
+        //Unpack<Protocols, ProtobufBinaryReader<Buffer>&>(element.GetInput(), std::ignore, k, v);
+
+        auto pack = std::tie(std::ignore, k, v);
+        Deserialize<Protocols, ProtobufBinaryReader<Buffer>&>(
+            element.GetInput(),
+            pack,
+            GetRuntimeSchema<std::tuple<decltype(std::ignore), decltype(k), decltype(v)> >());
+
+        mapped_at(var, k) = v;
+    }
+
+    template <typename Protocols, typename Transform, typename Key, typename T, typename Buffer>
+    inline void DeserializeMapElements(
+        const Transform& /*transform*/,
+        const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
+        const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
+        uint32_t /*size*/)
+    {
+        BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
+    }
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::enable_if<is_basic_container<X> >::type
+    inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
+    {
+        detail::MatchingMapByElement<Protocols>(var, keyType, GetTypeId(element), input, 0);
     }
 
 } // namespace bond

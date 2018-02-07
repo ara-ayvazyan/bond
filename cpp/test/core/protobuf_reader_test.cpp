@@ -5,6 +5,7 @@
 #include "protobuf_writer_reflection.h"
 #include "protobuf_writer.pb.h"
 
+#include <bond/core/tuple.h>
 #include <bond/protocol/protobuf_binary_reader.h>
 
 #include <google/protobuf/util/message_differencer.h>
@@ -366,6 +367,8 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StructContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
+
+    CheckBinaryFormat<unittest::proto::IntegerMapKeys, unittest::IntegerMapKeys>();
 }
 
 BOOST_AUTO_TEST_SUITE_END()

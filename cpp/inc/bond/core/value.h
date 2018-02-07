@@ -215,6 +215,10 @@ public:
         Skip();
     }
 
+    Reader GetInput() const
+    {
+        return _input;
+    }
 
 protected:
     Reader          _input;
@@ -596,6 +600,12 @@ public:
     RuntimeSchema GetRuntimeSchema() const
     {
         return _schema;
+    }
+
+
+    Reader GetInput() const
+    {
+        return _input;
     }
 
 private:
