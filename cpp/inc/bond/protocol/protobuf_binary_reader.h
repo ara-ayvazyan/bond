@@ -85,8 +85,7 @@ namespace bond
                   _transform{ transform }
             {}
 
-            template <typename Input>
-            bool Field(uint16_t id, const Metadata& metadata, const value<bool, Input>& value) const
+            bool Field(uint16_t id, const Metadata& metadata, const value<bool, Input&>& value) const
             {
                 switch (_type)
                 {
@@ -98,10 +97,10 @@ namespace bond
                 return false;
             }
 
-            template <typename T, typename Input>
+            template <typename T>
             typename boost::enable_if_c<std::is_arithmetic<T>::value
-                                    && !std::is_floating_point<T>::value, bool>::type
-            Field(uint16_t id, const Metadata& metadata, const value<T, Input>& value) const
+                                        && !std::is_floating_point<T>::value, bool>::type
+            Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
             {
                 switch (_type)
                 {
@@ -115,8 +114,7 @@ namespace bond
                 return false;
             }
 
-            template <typename Input>
-            bool Field(uint16_t id, const Metadata& metadata, const value<float, Input>& value) const
+            bool Field(uint16_t id, const Metadata& metadata, const value<float, Input&>& value) const
             {
                 switch (_type)
                 {
@@ -128,8 +126,7 @@ namespace bond
                 return false;
             }
 
-            template <typename Input>
-            bool Field(uint16_t id, const Metadata& metadata, const value<double, Input>& value) const
+            bool Field(uint16_t id, const Metadata& metadata, const value<double, Input&>& value) const
             {
                 switch (_type)
                 {
@@ -141,9 +138,9 @@ namespace bond
                 return false;
             }
 
-            template <typename T, typename Input>
+            template <typename T>
             typename boost::enable_if<is_string_type<T>, bool>::type
-            Field(uint16_t id, const Metadata& metadata, const value<T, Input>& value) const
+            Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
             {
                 switch (_type)
                 {
@@ -156,7 +153,7 @@ namespace bond
             }
 
         private:
-            WireType _type;
+            const WireType _type;
             const Transform& _transform;
         };
 
