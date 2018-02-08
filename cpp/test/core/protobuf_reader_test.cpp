@@ -369,6 +369,13 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
         unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
 
     CheckBinaryFormat<unittest::proto::IntegerMapKeys, unittest::IntegerMapKeys>();
+
+    CheckBinaryFormat<
+        unittest::proto::StringMapKey,
+        unittest::Box<std::map<std::string, uint32_t> > >();
+    CheckBinaryFormat<
+        unittest::proto::StringMapKey,
+        unittest::Box<std::map<std::wstring, uint32_t> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
