@@ -376,6 +376,15 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StringMapKey,
         unittest::Box<std::map<std::wstring, uint32_t> > >();
+
+    CheckBinaryFormat<unittest::proto::IntegerMapValues, unittest::IntegerMapValues>();
+
+    CheckBinaryFormat<
+        unittest::proto::StringMapValue,
+        unittest::Box<std::map<uint32_t, std::string> > >();
+    CheckBinaryFormat<
+        unittest::proto::StringMapValue,
+        unittest::Box<std::map<uint32_t, std::wstring> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()

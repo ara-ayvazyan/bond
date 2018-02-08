@@ -1007,7 +1007,7 @@ namespace bond
         typename element_type<X>::type::second_type v = make_value(var);
 
         DeserializeKeyValuePair<Protocols>(k, v, element.GetInput());
-        mapped_at(var, k) = v;
+        mapped_at(var, k) = std::move(v);
     }
 
     template <typename Protocols, typename Transform, typename Key, typename T, typename Buffer>
