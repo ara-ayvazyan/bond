@@ -13,6 +13,8 @@
 #include <boost/locale.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <tuple>
+
 /*
     Implements Protocol Buffers binary encoding.
     See https://developers.google.com/protocol-buffers/docs/encoding for details.
@@ -780,26 +782,13 @@ namespace bond
     {
     namespace proto
     {
-        template <typename Pair, typename T, bool IsKey, Encoding Enc>
-        struct MapKeyValueField
+        template <bool IsKey, Encoding Enc>
+        struct KeyValueFieldMetadata
         {
-            using struct_type = Pair;
-            using value_type = typename std::remove_reference<T>::type;
-            using field_type = typename remove_maybe<value_type>::type;
             using field_modifier = reflection::optional_field_modifier;
 
             static const Metadata metadata;
             BOND_STATIC_CONSTEXPR uint16_t id = IsKey ? 1 : 2;
-
-            static BOND_CONSTEXPR const value_type& GetVariable(const struct_type& obj)
-            {
-                return std::get<id - 1>(obj);
-            }
-
-            static BOND_CONSTEXPR value_type& GetVariable(struct_type& obj)
-            {
-                return std::get<id - 1>(obj);
-            }
 
             static Metadata GetMetadata()
             {
@@ -822,13 +811,31 @@ namespace bond
             }
         };
 
+        template <bool IsKey, Encoding Enc>
+        const Metadata KeyValueFieldMetadata<IsKey, Enc>::metadata = GetMetadata();
+
         template <typename Pair, typename T, bool IsKey, Encoding Enc>
-        const Metadata MapKeyValueField<Pair, T, IsKey, Enc>::metadata = GetMetadata();
+        struct KeyValueField : KeyValueFieldMetadata<IsKey, Enc>
+        {
+            using struct_type = Pair;
+            using value_type = typename std::remove_reference<T>::type;
+            using field_type = typename remove_maybe<value_type>::type;
+
+            static BOND_CONSTEXPR const value_type& GetVariable(const struct_type& obj)
+            {
+                return std::get<IsKey ? 0 : 1>(obj);
+            }
+
+            static BOND_CONSTEXPR value_type& GetVariable(struct_type& obj)
+            {
+                return std::get<IsKey ? 0 : 1>(obj);
+            }
+        };
 
         template <typename Key, Encoding KeyEnc, typename Value, Encoding ValueEnc>
-        struct MapKeyValuePair : std::tuple<Key, Value>
+        struct KeyValuePair : std::tuple<Key, Value>
         {
-            MapKeyValuePair(const std::tuple<Key, Value>& value)
+            KeyValuePair(const std::tuple<Key, Value>& value)
                 : std::tuple<Key, Value>(value)
             {}
 
@@ -845,34 +852,54 @@ namespace bond
                 }
 
                 using fields = boost::mpl::list<
-                    MapKeyValueField<MapKeyValuePair, Key, true, KeyEnc>,
-                    MapKeyValueField<MapKeyValuePair, Value, false, ValueEnc> >;
+                    KeyValueField<KeyValuePair, Key, true, KeyEnc>,
+                    KeyValueField<KeyValuePair, Value, false, ValueEnc> >;
 
                 static Metadata GetMetadata()
                 {
                     return reflection::MetadataInit(
-                        "MapKeyValuePair", "bond.proto.MapKeyValuePair", reflection::Attributes());
+                        "KeyValuePair", "bond.proto.KeyValuePair", reflection::Attributes());
                 }
             };
         };
 
         template <typename Key, Encoding KeyEnc, typename Value, Encoding ValueEnc>
-        const Metadata MapKeyValuePair<Key, KeyEnc, Value, ValueEnc>::Schema::metadata = GetMetadata();
+        const Metadata KeyValuePair<Key, KeyEnc, Value, ValueEnc>::Schema::metadata = GetMetadata();
 
-        template <
-            typename Protocols,
-            Encoding KeyEnc,
-            Encoding ValueEnc,
-            typename Key,
-            typename Value,
-            typename Buffer>
+        template <typename Protocols, Encoding KeyEnc, Encoding ValueEnc, typename Key, typename Value, typename Buffer>
         inline void DeserializeKeyValuePair(Key& key, Value& value, ProtobufBinaryReader<Buffer>& input)
         {
-            using KeyValuePair = MapKeyValuePair<Key, KeyEnc, Value, ValueEnc>;
-            using KeyValuePairRef = MapKeyValuePair<Key&, KeyEnc, Value&, ValueEnc>;
+            KeyValuePair<Key&, KeyEnc, Value&, ValueEnc> pair = std::tie(key, value);
 
-            KeyValuePairRef pair = std::tie(key, value);
-            Deserialize<Protocols, ProtobufBinaryReader<Buffer>&>(input, pair, GetRuntimeSchema<KeyValuePair>());
+            Deserialize<Protocols, ProtobufBinaryReader<Buffer>&>(input, pair,
+                GetRuntimeSchema<KeyValuePair<Key, KeyEnc, Value, ValueEnc> >());
+        }
+
+        template <typename Protocols, Encoding KeyEnc, typename Key, typename Value, typename Buffer>
+        inline void DeserializeKeyValuePair(
+            Key& key,
+            Value& value,
+            Encoding value_encoding,
+            ProtobufBinaryReader<Buffer>& input)
+        {
+            switch (value_encoding)
+            {
+            case Encoding::Fixed:
+                DeserializeKeyValuePair<Protocols, KeyEnc, Encoding::Fixed>(key, value, input);
+                break;
+
+            case Encoding::ZigZag:
+                DeserializeKeyValuePair<Protocols, KeyEnc, Encoding::ZigZag>(key, value, input);
+                break;
+
+            default:
+                {
+                    static const auto unavailable = static_cast<Encoding>(0xF);
+                    BOOST_ASSERT(unavailable == Unavailable<Encoding>());
+                    DeserializeKeyValuePair<Protocols, KeyEnc, unavailable>(key, value, input);
+                }
+                break;
+            }
         }
 
         template <typename Protocols, typename Key, typename Value, typename Buffer>
@@ -883,59 +910,21 @@ namespace bond
             Encoding value_encoding,
             ProtobufBinaryReader<Buffer>& input)
         {
-            static const auto unavailable = static_cast<Encoding>(0xF);
-            BOOST_ASSERT(unavailable == Unavailable<Encoding>());
-
             switch (key_encoding)
             {
             case Encoding::Fixed:
-                switch (value_encoding)
-                {
-                case Encoding::Fixed:
-                    DeserializeKeyValuePair<Protocols, Encoding::Fixed, Encoding::Fixed>(key, value, input);
-                    break;
-
-                case Encoding::ZigZag:
-                    DeserializeKeyValuePair<Protocols, Encoding::Fixed, Encoding::ZigZag>(key, value, input);
-                    break;
-
-                default:
-                    DeserializeKeyValuePair<Protocols, Encoding::Fixed, unavailable>(key, value, input);
-                    break;
-                }
+                DeserializeKeyValuePair<Protocols, Encoding::Fixed>(key, value, value_encoding, input);
                 break;
 
             case Encoding::ZigZag:
-                switch (value_encoding)
-                {
-                case Encoding::Fixed:
-                    DeserializeKeyValuePair<Protocols, Encoding::ZigZag, Encoding::Fixed>(key, value, input);
-                    break;
-
-                case Encoding::ZigZag:
-                    DeserializeKeyValuePair<Protocols, Encoding::ZigZag, Encoding::ZigZag>(key, value, input);
-                    break;
-
-                default:
-                    DeserializeKeyValuePair<Protocols, Encoding::ZigZag, unavailable>(key, value, input);
-                    break;
-                }
+                DeserializeKeyValuePair<Protocols, Encoding::ZigZag>(key, value, value_encoding, input);
                 break;
 
             default:
-                switch (value_encoding)
                 {
-                case Encoding::Fixed:
-                    DeserializeKeyValuePair<Protocols, unavailable, Encoding::Fixed>(key, value, input);
-                    break;
-
-                case Encoding::ZigZag:
-                    DeserializeKeyValuePair<Protocols, unavailable, Encoding::ZigZag>(key, value, input);
-                    break;
-
-                default:
-                    DeserializeKeyValuePair<Protocols, unavailable, unavailable>(key, value, input);
-                    break;
+                    static const auto unavailable = static_cast<Encoding>(0xF);
+                    BOOST_ASSERT(unavailable == Unavailable<Encoding>());
+                    DeserializeKeyValuePair<Protocols, unavailable>(key, value, value_encoding, input);
                 }
                 break;
             }
@@ -950,7 +939,6 @@ namespace bond
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
-
         do
         {
             typename element_type<X>::type item = make_element(var);
@@ -989,11 +977,6 @@ namespace bond
         input.Read(var);
     }
 
-    inline const char* GetTypeName(const decltype(std::ignore)&, const qualified_name_tag&)
-    {
-        return "Ignore";
-    }
-
     template <typename Protocols, typename X, typename Key, typename T, typename Buffer>
     inline void DeserializeMapElements(
         X& var,
@@ -1002,7 +985,6 @@ namespace bond
         uint32_t size)
     {
         BOOST_VERIFY(size == 0);
-
         typename element_type<X>::type::first_type k = make_key(var);
         typename element_type<X>::type::second_type v = make_value(var);
 
