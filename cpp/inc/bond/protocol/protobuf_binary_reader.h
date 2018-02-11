@@ -232,7 +232,7 @@ namespace bond
                     else if (field->type.id == BT_LIST || field->type.id == BT_SET)
                     {
                         BOOST_ASSERT(field->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, field->metadata));
+                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
 
                         transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                         continue;
@@ -240,17 +240,17 @@ namespace bond
                     else if (field->type.id == BT_MAP)
                     {
                         BOOST_ASSERT(field->type.key.hasvalue());
-                        _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, field->metadata));
+                        _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
 
                         BOOST_ASSERT(field->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, field->metadata));
+                        _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, &field->metadata));
 
                         transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                         continue;
                     }
                     else
                     {
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.id, field->metadata));
+                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.id, &field->metadata));
 
                         if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, transform), _input))
                         {
