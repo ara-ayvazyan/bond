@@ -1009,4 +1009,11 @@ namespace bond
         detail::MatchingMapByElement<Protocols>(var, keyType, GetTypeId(element), input, 0);
     }
 
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::disable_if<is_basic_container<X> >::type
+    inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
+    {
+        detail::MapByKey<Protocols>(var, keyType, element, input, 0);
+    }
+
 } // namespace bond

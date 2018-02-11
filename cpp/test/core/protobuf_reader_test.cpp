@@ -99,6 +99,10 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StringMapValue,
         unittest::Box<std::map<uint32_t, std::wstring> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StructMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::Integers> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
