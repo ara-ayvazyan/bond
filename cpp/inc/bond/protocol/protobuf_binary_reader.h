@@ -231,6 +231,8 @@ namespace bond
                     }
                     else if (field->type.id == BT_LIST || field->type.id == BT_SET)
                     {
+                        // TODO: match by element type
+
                         BOOST_ASSERT(field->type.element.hasvalue());
                         _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
 
@@ -239,14 +241,18 @@ namespace bond
                     }
                     else if (field->type.id == BT_MAP)
                     {
-                        BOOST_ASSERT(field->type.key.hasvalue());
-                        _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
+                        switch (type)
+                        {
+                        case WireType::LengthDelimited:
+                            BOOST_ASSERT(field->type.key.hasvalue());
+                            _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
 
-                        BOOST_ASSERT(field->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, &field->metadata));
+                            BOOST_ASSERT(field->type.element.hasvalue());
+                            _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, &field->metadata));
 
-                        transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                        continue;
+                            transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
+                            continue;
+                        }
                     }
                     else
                     {
@@ -261,8 +267,6 @@ namespace bond
 
                 transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
             }
-
-            _input.ReadFieldEnd();
 
             return false;
         }
@@ -306,6 +310,8 @@ namespace bond
             if (_size != 0)
             {
                 BOOST_ASSERT(_type == WireType::LengthDelimited);
+
+                Consume(_size);
 
                 if (!_lengths)
                 {

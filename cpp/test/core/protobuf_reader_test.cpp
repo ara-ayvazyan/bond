@@ -103,6 +103,10 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::StructMapValue,
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::Integers> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::BlobMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::blob> > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -110,5 +114,6 @@ BOOST_AUTO_TEST_SUITE_END()
 bool init_unit_test()
 {
     boost::debug::detect_memory_leaks(false);
+    bond::RandomProtocolReader::Seed(time(nullptr), time(nullptr) / 1000);
     return true;
 }
