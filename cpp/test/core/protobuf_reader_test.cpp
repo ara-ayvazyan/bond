@@ -27,8 +27,18 @@ void CheckBinaryFormat(const Bond& bond_struct)
 
     bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
     bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
-    auto bond_struct2 = bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
-    BOOST_CHECK((bond_struct == bond_struct2));
+
+    // Compile-time schema
+    {
+        auto bond_struct2 = bond::Deserialize<Bond>(reader);
+        BOOST_CHECK((bond_struct == bond_struct2));
+    }
+
+    // Runtime schema
+    {
+        auto bond_struct2 = bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
+        BOOST_CHECK((bond_struct == bond_struct2));
+    }
 }
 
 template <typename Proto, typename Bond>

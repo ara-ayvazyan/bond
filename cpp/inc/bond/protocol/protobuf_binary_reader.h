@@ -606,10 +606,18 @@ namespace bond
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::disable_if<is_basic_container<X> >::type
+    typename boost::enable_if<is_nested_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         DeserializeElements<Protocols>(var, element, 0);
+    }
+
+
+    template <typename Protocols, typename X, typename T1, typename T2, typename Buffer>
+    inline void DeserializeContainer(
+        X& var, const value<std::pair<T1, T2>, ProtobufBinaryReader<Buffer>&>& element, ProtobufBinaryReader<Buffer>& input)
+    {
+        DeserializeMap<Protocols>(var, get_type_id<T1>::value, value<T2, ProtobufBinaryReader<Buffer>&>{ input, false }, input);
     }
 
 
@@ -656,7 +664,7 @@ namespace bond
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::disable_if<is_basic_container<X> >::type
+    typename boost::enable_if<is_nested_container<X> >::type
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MapByKey<Protocols>(var, keyType, element, input, 0);
