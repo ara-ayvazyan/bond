@@ -121,6 +121,10 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::BlobMapValue,
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::nullable<int8_t> > > >();
+
+    CheckBinaryFormat<unittest::proto::Nullable, unittest::Nullable>();
+
+    CheckBinaryFormat<unittest::proto::ComplexStruct, unittest::ComplexStruct>();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
