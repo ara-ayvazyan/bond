@@ -247,6 +247,16 @@ namespace bond
             }
         }
 
+        void ReadByte(blob::value_type& value)
+        {
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
+            BOOST_ASSERT(_size != 0);
+
+            _input.Read(value);
+            Consume(sizeof(blob::value_type));
+            _size -= sizeof(blob::value_type);
+        }
+
         template <typename T>
         void Skip()
         {
@@ -515,7 +525,8 @@ namespace bond
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_container<X>::value && !is_map_container<X>::value>::type
+    typename boost::disable_if_c<is_list_container<X>::value
+                                && std::is_same<typename element_type<X>::type, blob::value_type>::value>::type
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
@@ -526,6 +537,52 @@ namespace bond
             container_append(var, item);
         }
         while (element.GetInput().GetSize() != 0);
+    }
+
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::enable_if_c<is_list_container<X>::value
+                                && std::is_same<typename element_type<X>::type, blob::value_type>::value>::type
+    inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+    {
+        BOOST_VERIFY(size == 0);
+        do
+        {
+            blob::value_type byte;
+            element.GetInput().ReadByte(byte);
+            container_append(var, byte);
+        }
+        while (element.GetInput().GetSize() != 0);
+    }
+
+
+    template <typename Protocols, typename X, typename Allocator, bool useValue, typename T, typename Buffer>
+    inline void DeserializeElements(
+        nullable<X, Allocator, useValue>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+    {
+        BOOST_VERIFY(size == 0);
+
+        element.template Deserialize<Protocols>(var.set());
+
+        if (element.GetInput().GetSize() != 0)
+        {
+            element.Skip();
+        }
+    }
+
+
+    template <typename Protocols, typename Allocator, bool useValue, typename T, typename Buffer>
+    inline void DeserializeElements(
+        nullable<blob::value_type, Allocator, useValue>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+    {
+        BOOST_VERIFY(size == 0);
+
+        element.GetInput().ReadByte(var.set());
+
+        if (element.GetInput().GetSize() != 0)
+        {
+            element.Skip();
+        }
     }
 
 

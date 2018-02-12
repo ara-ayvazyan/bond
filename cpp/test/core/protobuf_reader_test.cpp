@@ -45,6 +45,8 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::wstring> >();
 
     CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::blob> >();
+    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<std::vector<int8_t> > >();
+    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::nullable<int8_t> > >();
 
     CheckBinaryFormat<
         unittest::proto::NestedStruct,
@@ -73,6 +75,12 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::BlobContainer,
         unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > >();
+    CheckBinaryFormat<
+        unittest::proto::BlobContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<std::vector<int8_t> > > >();
+    CheckBinaryFormat<
+        unittest::proto::BlobContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<bond::nullable<int8_t> > > >();
 
     unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > box;
     box.value.resize(2, bond::blob{});
@@ -107,6 +115,12 @@ BOOST_AUTO_TEST_CASE(ExperimentTest)
     CheckBinaryFormat<
         unittest::proto::BlobMapValue,
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::blob> > >();
+    CheckBinaryFormat<
+        unittest::proto::BlobMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, std::vector<int8_t> > > >();
+    CheckBinaryFormat<
+        unittest::proto::BlobMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::nullable<int8_t> > > >();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
