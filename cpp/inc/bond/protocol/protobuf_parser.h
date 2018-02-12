@@ -122,6 +122,8 @@ namespace bond
         template <typename Schema, typename Transform>
         bool Read(const Schema&, const Transform& transform)
         {
+            BOOST_STATIC_ASSERT(std::is_same<typename Schema::base, no_base>::value);
+
             transform.Begin(Schema::metadata);
             bool done = ReadFields(Schema{}, transform);
             transform.End();
@@ -147,36 +149,64 @@ namespace bond
         {
             using Head = typename boost::mpl::deref<Fields>::type;
 
-            do
+            if (!TryField<Head>(transform, type, id))
             {
-                if (Head::id == id)
-                {
-                    if (!NextField(Head{}, transform, type))
-                    {
-                        transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
-                    }
-                }
-                else // TODO:
+                if (Head::id < id)
                 {
                     return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id);
                 }
+                else // Head::id > id
+                {
+                    transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
+                }
             }
-            while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id));
+
+            while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id))
+            {
+                if (!TryField<Head>(transform, type, id))
+                {
+                    if (Head::id < id)
+                    {
+                        return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id);
+                    }
+                    else // Head::id > id
+                    {
+                        return ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id);
+                    }
+                }
+            }
 
             return false;
         }
 
         template <typename Schema, typename Transform>
-        bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform&, WireType&, uint16_t&)
+        bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform& transform, WireType& type, uint16_t& id)
         {
-            // TODO:
-            return false;
+            transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
+
+            return ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id);
         }
 
 
         template <typename T, typename Transform>
+        bool TryField(const Transform& transform, WireType type, uint16_t id)
+        {
+            if (T::id == id)
+            {
+                if (!Field<T>(transform, type))
+                {
+                    transform.UnknownField(T::id, value<void, Input>{ _input, BT_UNAVAILABLE });
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        template <typename T, typename Transform>
         typename boost::enable_if<is_basic_type<typename T::field_type>, bool>::type
-        NextField(const T&, const Transform& transform, WireType type)
+        Field(const Transform& transform, WireType type)
         {
             _input.SetEncoding(detail::proto::ReadEncoding(get_type_id<typename T::field_type>::value, &T::metadata));
 
@@ -192,7 +222,7 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_bond_type<typename T::field_type>, bool>::type
-        NextField(const T&, const Transform& transform, WireType type)
+        Field(const Transform& transform, WireType type)
         {
             if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type))
             {
@@ -206,7 +236,7 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_list_container<typename T::field_type>, bool>::type
-        NextField(const T&, const Transform& transform, WireType type)
+        Field(const Transform& transform, WireType type)
         {
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -229,7 +259,7 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_set_container<typename T::field_type>, bool>::type
-        NextField(const T&, const Transform& transform, WireType type)
+        Field(const Transform& transform, WireType type)
         {
             _input.SetEncoding(detail::proto::ReadEncoding(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata));
 
@@ -242,7 +272,7 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
-        NextField(const T&, const Transform& transform, WireType type)
+        Field(const Transform& transform, WireType type)
         {
             if (type == WireType::LengthDelimited)
             {
