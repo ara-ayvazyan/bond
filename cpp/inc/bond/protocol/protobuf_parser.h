@@ -171,7 +171,10 @@ namespace bond
                         // TODO: match by element type
 
                         BOOST_ASSERT(field->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
+                        if (!(field->type.id == BT_LIST && field->type.element->id == BT_INT8)) // !blob
+                        {
+                            _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
+                        }
 
                         transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                         continue;

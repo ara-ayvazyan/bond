@@ -34,96 +34,310 @@ void CheckBinaryFormat(const Bond& bond_struct)
 template <typename Proto, typename Bond>
 void CheckBinaryFormat()
 {
+    CheckBinaryFormat<Proto>(Bond{});
     CheckBinaryFormat<Proto>(InitRandom<Bond>());
 }
 
-BOOST_AUTO_TEST_CASE(ExperimentTest)
+template <typename Bond>
+void CheckUnsupportedType()
+{
+    bond::InputBuffer input;
+    bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+    bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
+    // TODO:
+}
+
+using blob_types = boost::mpl::list<bond::blob, std::vector<int8_t>, bond::nullable<int8_t> >;
+
+BOOST_AUTO_TEST_CASE(InheritanceTests)
+{
+    CheckUnsupportedType<unittest::Derived>();
+}
+
+BOOST_AUTO_TEST_CASE(FieldOrdinalTests)
+{
+    CheckUnsupportedType<unittest::Field0>();
+    CheckUnsupportedType<unittest::Field19000>();
+    CheckUnsupportedType<unittest::Field19111>();
+    CheckUnsupportedType<unittest::Field19999>();
+}
+
+BOOST_AUTO_TEST_CASE(IntegerTests)
 {
     CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
 
-    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::string> >();
-    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongEncoding<std::wstring> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<uint8_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<uint16_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<uint32_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<uint64_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<int8_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<int16_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<int32_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<int64_t> >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<unittest::Enum> >();
 
-    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::blob> >();
-    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<std::vector<int8_t> > >();
-    CheckBinaryFormat<unittest::proto::Blob, unittest::Box<bond::nullable<int8_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<uint8_t> >();
+    CheckUnsupportedType<unittest::BoxZigZag<uint16_t> >();
+    CheckUnsupportedType<unittest::BoxZigZag<uint32_t> >();
+    CheckUnsupportedType<unittest::BoxZigZag<uint64_t> >();
+}
 
+BOOST_AUTO_TEST_CASE(StringTests)
+{
+    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongPackingWrongEncoding<std::string> >();
+
+    CheckBinaryFormat<unittest::proto::String, unittest::BoxWrongPackingWrongEncoding<std::wstring> >();
+}
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(BlobTests, T, blob_types)
+{
+    CheckBinaryFormat<unittest::proto::Blob, unittest::BoxWrongPackingWrongEncoding<T> >();
+}
+
+BOOST_AUTO_TEST_CASE(IntegerContainerTests)
+{
+    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
+    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
+
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<unittest::Enum> > >();
+
+    CheckUnsupportedType<unittest::BoxZigZag<vector<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<vector<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<vector<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<vector<uint64_t> > >();
+
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<unittest::Enum> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<bool> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<float> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<vector<double> > >();
+}
+
+BOOST_AUTO_TEST_CASE(IntegerSetContainerTests)
+{
+    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersSetContainer>();
+    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersSetContainer>();
+
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongEncoding<set<unittest::Enum> > >();
+
+    CheckUnsupportedType<unittest::BoxZigZag<set<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<set<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<set<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxZigZag<set<uint64_t> > >();
+
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<int8_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<int16_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<int32_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<int64_t> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<unittest::Enum> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<bool> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<float> > >();
+    CheckUnsupportedType<unittest::BoxWrongPacking<set<double> > >();
+}
+
+BOOST_AUTO_TEST_CASE(StringContainerTests)
+{
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<std::string> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
+}
+
+BOOST_AUTO_TEST_CASE(StringSetContainerTests)
+{
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::set<std::string> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StringContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::set<std::wstring> > >();
+}
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(BlobContainerTests, T, blob_types)
+{
+    CheckBinaryFormat<
+        unittest::proto::BlobContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<T> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::BlobContainer,
+        unittest::BoxWrongPackingWrongEncoding<bond::nullable<T> > >();
+
+    unittest::BoxWrongPackingWrongEncoding<std::vector<T> > box;
+    box.value.resize(2);
+    CheckBinaryFormat<unittest::proto::BlobContainer>(box);
+}
+
+BOOST_AUTO_TEST_CASE(StructContainerTests)
+{
+    CheckBinaryFormat<
+        unittest::proto::StructContainer,
+        unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
+}
+
+BOOST_AUTO_TEST_CASE(NestedStructTests)
+{
     CheckBinaryFormat<
         unittest::proto::NestedStruct,
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
-    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
-    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
+    /*unittest::BoxWrongPackingWrongEncoding<bond::bonded<unittest::Integers> > box;
+    box.value = bond::bonded<unittest::Integers>{ InitRandom<unittest::Integers>() };
+    CheckBinaryFormat<unittest::proto::NestedStruct>(box);*/
+}
 
-    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersSetContainer>();
-    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersSetContainer>();
+BOOST_AUTO_TEST_CASE(NullableTests)
+{
+    CheckBinaryFormat<unittest::proto::Nullable, unittest::Nullable>();
+}
 
-    CheckBinaryFormat<
-        unittest::proto::StringContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<std::string> > >();
-    CheckBinaryFormat<
-        unittest::proto::StringContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<std::wstring> > >();
-
-    CheckBinaryFormat<
-        unittest::proto::StringContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::set<std::string> > >();
-    CheckBinaryFormat<
-        unittest::proto::StringContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::set<std::wstring> > >();
-
-    CheckBinaryFormat<
-        unittest::proto::BlobContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > >();
-    CheckBinaryFormat<
-        unittest::proto::BlobContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<std::vector<int8_t> > > >();
-    CheckBinaryFormat<
-        unittest::proto::BlobContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<bond::nullable<int8_t> > > >();
-
-    unittest::BoxWrongPackingWrongEncoding<std::vector<bond::blob> > box;
-    box.value.resize(2, bond::blob{});
-    CheckBinaryFormat<unittest::proto::BlobContainer>(box);
-
-    CheckBinaryFormat<
-        unittest::proto::StructContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
-
+BOOST_AUTO_TEST_CASE(IntegerMapKeyTests)
+{
     CheckBinaryFormat<unittest::proto::IntegerMapKeys, unittest::IntegerMapKeys>();
 
-    CheckBinaryFormat<
-        unittest::proto::StringMapKey,
-        unittest::Box<std::map<std::string, uint32_t> > >();
-    CheckBinaryFormat<
-        unittest::proto::StringMapKey,
-        unittest::Box<std::map<std::wstring, uint32_t> > >();
+    CheckUnsupportedType<unittest::Box<std::map<float, uint32_t> > >();
+    CheckUnsupportedType<unittest::Box<std::map<double, uint32_t> > >();
+}
 
+BOOST_AUTO_TEST_CASE(StringMapKeyTests)
+{
+    CheckBinaryFormat<
+        unittest::proto::StringMapKey,
+        unittest::BoxWrongPackingWrongKeyEncoding<std::map<std::string, uint32_t> > >();
+
+    CheckBinaryFormat<
+        unittest::proto::StringMapKey,
+        unittest::BoxWrongPackingWrongKeyEncoding<std::map<std::wstring, uint32_t> > >();
+}
+
+BOOST_AUTO_TEST_CASE(IntegerMapValueTests)
+{
     CheckBinaryFormat<unittest::proto::IntegerMapValues, unittest::IntegerMapValues>();
+}
+
+BOOST_AUTO_TEST_CASE(StringMapValueTests)
+{
+    CheckBinaryFormat<
+        unittest::proto::StringMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, std::string> > >();
 
     CheckBinaryFormat<
         unittest::proto::StringMapValue,
-        unittest::Box<std::map<uint32_t, std::string> > >();
-    CheckBinaryFormat<
-        unittest::proto::StringMapValue,
-        unittest::Box<std::map<uint32_t, std::wstring> > >();
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, std::wstring> > >();
+}
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(BlobMapValueTests, T, blob_types)
+{
+    CheckBinaryFormat<
+        unittest::proto::BlobMapValue,
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, T> > >();
+}
+
+BOOST_AUTO_TEST_CASE(StructMapValueTests)
+{
     CheckBinaryFormat<
         unittest::proto::StructMapValue,
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::Integers> > >();
+}
 
-    CheckBinaryFormat<
-        unittest::proto::BlobMapValue,
-        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::blob> > >();
-    CheckBinaryFormat<
-        unittest::proto::BlobMapValue,
-        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, std::vector<int8_t> > > >();
-    CheckBinaryFormat<
-        unittest::proto::BlobMapValue,
-        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, bond::nullable<int8_t> > > >();
+BOOST_AUTO_TEST_CASE(NestedContainersTests)
+{
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<float> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<double> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<std::wstring> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<bond::blob> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::vector<unittest::Integers> > > >();
 
-    CheckBinaryFormat<unittest::proto::Nullable, unittest::Nullable>();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<int8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<float> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<double> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::set<std::wstring> > > >();
 
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<float> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<double> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<std::wstring> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<bond::blob> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<unittest::Integers> > > >();
+
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, float> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, double> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, std::wstring> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, bond::blob> > > >();
+    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, unittest::Integers> > > >();
+}
+
+BOOST_AUTO_TEST_CASE(ComplexStructTests)
+{
     CheckBinaryFormat<unittest::proto::ComplexStruct, unittest::ComplexStruct>();
 }
 

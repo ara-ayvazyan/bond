@@ -42,7 +42,8 @@ namespace bond
               _id{ 0 },
               _encoding{ detail::proto::Unavailable<Encoding>() },
               _key_encoding{ detail::proto::Unavailable<Encoding>() },
-              _size{ 0 }
+              _size{ 0 },
+              _lengths{ boost::make_shared<detail::SimpleArray<uint32_t> >() }
         {}
 
         void ReadStructBegin(bool base = false)
@@ -52,17 +53,18 @@ namespace bond
                 detail::proto::NotSupportedException("Inheritance");
             }
 
-            if (_size != 0)
+            BOOST_ASSERT(_lengths);
+
+            if (_lengths->empty())
+            {
+                _lengths = boost::make_shared<detail::SimpleArray<uint32_t> >();
+                _lengths->push((std::numeric_limits<uint32_t>::max)());
+            }
+            else
             {
                 BOOST_ASSERT(_type == WireType::LengthDelimited);
 
                 Consume(_size);
-
-                if (!_lengths)
-                {
-                    _lengths = boost::make_shared<detail::SimpleArray<uint32_t> >();
-                }
-
                 _lengths->push(_size);
             }
         }
@@ -70,11 +72,10 @@ namespace bond
         void ReadStructEnd(bool base = false)
         {
             BOOST_VERIFY(!base);
+            BOOST_ASSERT(_lengths && !_lengths->empty());
 
-            if (_lengths && !_lengths->empty())
-            {
-                _lengths->pop(std::nothrow);
-            }
+            uint32_t length = _lengths->pop(std::nothrow);
+            BOOST_VERIFY(_lengths->empty() || length == 0);
         }
 
         bool ReadFieldBegin(WireType& type, uint16_t& id)
@@ -283,18 +284,17 @@ namespace bond
     private:
         void Consume(uint32_t size)
         {
-            if (_lengths && !_lengths->empty())
-            {
-                uint32_t& length = _lengths->top(std::nothrow);
+            BOOST_ASSERT(_lengths && !_lengths->empty());
 
-                if (length >= size)
-                {
-                    length -= size;
-                }
-                else
-                {
-                    BOND_THROW(CoreException, "Trying to read more than declared.");
-                }
+            uint32_t& length = _lengths->top(std::nothrow);
+
+            if (length >= size)
+            {
+                length -= size;
+            }
+            else
+            {
+                BOND_THROW(CoreException, "Trying to read more than declared.");
             }
         }
 
@@ -403,7 +403,9 @@ namespace bond
 
         bool ReadTag()
         {
-            if ((!_lengths || _lengths->empty() || _lengths->top(std::nothrow) != 0) && !_input.IsEof())
+            BOOST_ASSERT(_lengths && !_lengths->empty());
+
+            if ((_lengths->top(std::nothrow) != 0) && !_input.IsEof())
             {
                 uint64_t tag;
                 ReadVarInt(tag);
@@ -546,13 +548,13 @@ namespace bond
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
-        do
+
+        while (element.GetInput().GetSize() != 0)
         {
             blob::value_type byte;
             element.GetInput().ReadByte(byte);
             container_append(var, byte);
         }
-        while (element.GetInput().GetSize() != 0);
     }
 
 
@@ -577,7 +579,10 @@ namespace bond
     {
         BOOST_VERIFY(size == 0);
 
-        element.GetInput().ReadByte(var.set());
+        if (element.GetInput().GetSize() != 0)
+        {
+            element.GetInput().ReadByte(var.set());
+        }
 
         if (element.GetInput().GetSize() != 0)
         {
