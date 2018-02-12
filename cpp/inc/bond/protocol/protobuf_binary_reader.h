@@ -48,11 +48,7 @@ namespace bond
 
         void ReadStructBegin(bool base = false)
         {
-            if (base)
-            {
-                detail::proto::NotSupportedException("Inheritance");
-            }
-
+            BOOST_VERIFY(!base);
             BOOST_ASSERT(_lengths);
 
             if (_lengths->empty())

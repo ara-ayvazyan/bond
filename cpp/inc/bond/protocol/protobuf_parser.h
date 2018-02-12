@@ -63,6 +63,11 @@ namespace bond
         template <typename Transform>
         bool Read(const RuntimeSchema& schema, const Transform& transform)
         {
+            if (schema.HasBase())
+            {
+                detail::proto::NotSupportedException("Inheritance");
+            }
+
             transform.Begin(schema.GetStruct().metadata);
             bool done = ReadFields(schema, transform);
             transform.End();
