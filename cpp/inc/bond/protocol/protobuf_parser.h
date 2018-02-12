@@ -107,22 +107,13 @@ namespace bond
                 return false;
             }
 
-            bool Field(uint16_t id, const Metadata& metadata, const value<float, Input&>& value) const
+            template <typename T>
+            typename boost::enable_if<std::is_floating_point<T>, bool>::type
+            Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
             {
                 switch (_type)
                 {
                 case WireType::Fixed32:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-            bool Field(uint16_t id, const Metadata& metadata, const value<double, Input&>& value) const
-            {
-                switch (_type)
-                {
                 case WireType::Fixed64:
                     _transform.Field(id, metadata, value);
                     return true;
