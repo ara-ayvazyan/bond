@@ -110,9 +110,7 @@ namespace proto
     inline void DeserializeKeyValuePair(Key& key, Value& value, Reader& input)
     {
         KeyValuePair<Key&, KeyEnc, Value&, ValueEnc> pair = std::tie(key, value);
-
-        Deserialize<Protocols, Reader&>(input, pair,
-            GetRuntimeSchema<KeyValuePair<Key, KeyEnc, Value, ValueEnc> >());
+        Deserialize<Protocols, Reader&>(input, pair);
     }
 
 
