@@ -223,6 +223,23 @@ void clear_map(std::map<K, T, C, A>& map)
 }
 
 
+// container_append
+template <typename T>
+typename boost::enable_if<is_list_container<T> >::type
+inline container_append(T& list, const typename element_type<T>::type& item)
+{
+    list.push_back(item);
+}
+
+
+template <typename T>
+typename boost::enable_if<is_set_container<T> >::type
+inline container_append(T& set, const typename element_type<T>::type& item)
+{
+    set_insert(set, item);
+}
+
+
 // use_map_allocator_for_keys
 template <typename T, typename Enable = void> struct
 use_map_allocator_for_keys

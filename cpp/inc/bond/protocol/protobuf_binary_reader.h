@@ -5,15 +5,14 @@
 
 #include <bond/core/config.h>
 
+#include "detail/protobuf_pair.h"
 #include "detail/protobuf_utils.h"
+#include "protobuf_parser.h"
 #include "detail/simple_array.h"
 #include <bond/core/detail/omit_default.h>
-#include <bond/core/bond_types.h>
 
 #include <boost/locale.hpp>
 #include <boost/shared_ptr.hpp>
-
-#include <tuple>
 
 /*
     Implements Protocol Buffers binary encoding.
@@ -22,260 +21,6 @@
 
 namespace bond
 {
-    namespace detail
-    {
-    namespace proto
-    {
-        template <typename Schema>
-        class FieldEnumerator;
-
-        template <>
-        class FieldEnumerator<RuntimeSchema>
-        {
-        public:
-            explicit FieldEnumerator(const RuntimeSchema& schema)
-                : _begin{ schema.GetStruct().fields.begin() },
-                  _end{ schema.GetStruct().fields.end() },
-                  _it{ _begin }
-            {}
-
-            const FieldDef* find(uint16_t id)
-            {
-                if (_it == _end
-                    || (_it->id != id && (++_it == _end || _it->id != id)))
-                {
-                    _it = std::lower_bound(_begin, _end, id,
-                        [](const FieldDef& f, uint16_t id) { return f.id < id; });
-                }
-
-                return _it != _end && _it->id == id ? &*_it : nullptr;
-            }
-
-        private:
-            const std::vector<FieldDef>::const_iterator _begin;
-            const std::vector<FieldDef>::const_iterator _end;
-            std::vector<FieldDef>::const_iterator _it;
-        };
-
-        template <typename Schema>
-        FieldEnumerator<Schema> EnumerateFields(const Schema& schema)
-        {
-            return FieldEnumerator<Schema>{ schema };
-        }
-
-    } // namespace proto
-    } // namespace detail
-
-
-    template <typename Input>
-    class ProtobufParser
-    {
-        using WireType = detail::proto::WireType;
-
-    public:
-        ProtobufParser(Input input, bool base)
-            : _input{ input }
-        {
-            BOOST_ASSERT(!base);
-        }
-
-        template <typename Transform, typename Schema>
-        bool Apply(const Transform& transform, const Schema& schema)
-        {
-            detail::StructBegin(_input, false);
-            bool result = Read(schema, transform);
-            detail::StructEnd(_input, false);
-            return result;
-        }
-
-    private:
-        // use compile-time schema
-        template <typename Schema, typename Transform>
-        bool Read(const Schema&, const Transform& transform)
-        {
-            transform.Begin(Schema::metadata);
-            bool done = ReadFields(typename boost::mpl::begin<typename Schema::fields>::type{}, transform);
-            transform.End();
-            return done;
-        }
-
-        template <typename Fields, typename Transform>
-        bool ReadFields(const Fields& /*fields*/, const Transform& /*transform*/)
-        {
-            using Head = typename boost::mpl::deref<Fields>::type;
-            // TODO:
-            return false;
-        }
-
-        template <typename Transform>
-        bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform&)
-        {
-            return false;
-        }
-
-        // use runtime schema
-        template <typename Transform>
-        bool Read(const RuntimeSchema& schema, const Transform& transform)
-        {
-            transform.Begin(schema.GetStruct().metadata);
-            bool done = ReadFields(schema, transform);
-            transform.End();
-            return done;
-        }
-
-        template <typename Transform>
-        class WireTypeFieldBinder
-        {
-        public:
-            WireTypeFieldBinder(WireType type, const Transform& transform)
-                : _type{ type },
-                  _transform{ transform }
-            {}
-
-            bool Field(uint16_t id, const Metadata& metadata, const value<bool, Input&>& value) const
-            {
-                switch (_type)
-                {
-                case WireType::VarInt:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-            template <typename T>
-            typename boost::enable_if_c<std::is_arithmetic<T>::value
-                                        && !std::is_floating_point<T>::value, bool>::type
-            Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
-            {
-                switch (_type)
-                {
-                case WireType::VarInt:
-                case WireType::Fixed32:
-                case WireType::Fixed64:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-            bool Field(uint16_t id, const Metadata& metadata, const value<float, Input&>& value) const
-            {
-                switch (_type)
-                {
-                case WireType::Fixed32:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-            bool Field(uint16_t id, const Metadata& metadata, const value<double, Input&>& value) const
-            {
-                switch (_type)
-                {
-                case WireType::Fixed64:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-            template <typename T>
-            typename boost::enable_if<is_string_type<T>, bool>::type
-            Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
-            {
-                switch (_type)
-                {
-                case WireType::LengthDelimited:
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-        private:
-            const WireType _type;
-            const Transform& _transform;
-        };
-
-        template <typename Transform>
-        WireTypeFieldBinder<Transform> BindWireTypeField(WireType type, const Transform& transform)
-        {
-            return WireTypeFieldBinder<Transform>{ type, transform };
-        }
-
-        template <typename Transform>
-        bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
-        {
-            WireType type;
-            uint16_t id;
-
-            for (auto fields = detail::proto::EnumerateFields(schema); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
-            {
-                if (const FieldDef* field = fields.find(id))
-                {
-                    if (field->type.id == BT_STRUCT)
-                    {
-                        switch (type)
-                        {
-                        case WireType::LengthDelimited:
-                            transform.Field(id, field->metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                            continue;
-                        }
-                    }
-                    else if (field->type.id == BT_LIST || field->type.id == BT_SET)
-                    {
-                        // TODO: match by element type
-
-                        BOOST_ASSERT(field->type.element.hasvalue());
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
-
-                        transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                        continue;
-                    }
-                    else if (field->type.id == BT_MAP)
-                    {
-                        switch (type)
-                        {
-                        case WireType::LengthDelimited:
-                            BOOST_ASSERT(field->type.key.hasvalue());
-                            _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
-
-                            BOOST_ASSERT(field->type.element.hasvalue());
-                            _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, &field->metadata));
-
-                            transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.id, &field->metadata));
-
-                        if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, transform), _input))
-                        {
-                            continue;
-                        }
-                    }
-                }
-
-                transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
-            }
-
-            return false;
-        }
-
-
-        Input _input;
-    };
-
-
     template <typename BufferT>
     class ProtobufBinaryWriter;
 
@@ -738,21 +483,6 @@ namespace bond
     };
 
 
-    template <typename T>
-    typename boost::enable_if<is_list_container<T> >::type
-    inline container_append(T& list, const typename element_type<T>::type& item)
-    {
-        list.push_back(item);
-    }
-
-    template <typename T>
-    typename boost::enable_if<is_set_container<T> >::type
-    inline container_append(T& set, const typename element_type<T>::type& item)
-    {
-        set_insert(set, item);
-    }
-
-
     namespace detail
     {
         template <typename Buffer>
@@ -784,162 +514,6 @@ namespace bond
     } // namespace detail
 
 
-    namespace detail
-    {
-    namespace proto
-    {
-        template <bool IsKey, Encoding Enc>
-        struct KeyValueFieldMetadata
-        {
-            using field_modifier = reflection::optional_field_modifier;
-
-            static const Metadata metadata;
-            BOND_STATIC_CONSTEXPR uint16_t id = IsKey ? 1 : 2;
-
-            static Metadata GetMetadata()
-            {
-                Metadata m;
-                m.name = IsKey ? "Key" : "Value";
-
-                switch (Enc)
-                {
-                case Encoding::Fixed:
-                    m.attributes["ProtoEncode"] = "Fixed";
-                    break;
-                case Encoding::ZigZag:
-                    m.attributes["ProtoEncode"] = "ZigZag";
-                    break;
-                default:
-                    break;
-                }
-
-                return m;
-            }
-        };
-
-        template <bool IsKey, Encoding Enc>
-        const Metadata KeyValueFieldMetadata<IsKey, Enc>::metadata = GetMetadata();
-
-        template <typename Pair, typename T, bool IsKey, Encoding Enc>
-        struct KeyValueField : KeyValueFieldMetadata<IsKey, Enc>
-        {
-            using struct_type = Pair;
-            using value_type = typename std::remove_reference<T>::type;
-            using field_type = typename remove_maybe<value_type>::type;
-
-            static BOND_CONSTEXPR const value_type& GetVariable(const struct_type& obj)
-            {
-                return std::get<IsKey ? 0 : 1>(obj);
-            }
-
-            static BOND_CONSTEXPR value_type& GetVariable(struct_type& obj)
-            {
-                return std::get<IsKey ? 0 : 1>(obj);
-            }
-        };
-
-        template <typename Key, Encoding KeyEnc, typename Value, Encoding ValueEnc>
-        struct KeyValuePair : std::tuple<Key, Value>
-        {
-            KeyValuePair(const std::tuple<Key, Value>& value)
-                : std::tuple<Key, Value>(value)
-            {}
-
-            struct Schema
-            {
-                using base = no_base;
-
-                static const Metadata metadata;
-
-                Schema()
-                {
-                    // Force instantiation of template statics
-                    (void)metadata;
-                }
-
-                using fields = boost::mpl::list<
-                    KeyValueField<KeyValuePair, Key, true, KeyEnc>,
-                    KeyValueField<KeyValuePair, Value, false, ValueEnc> >;
-
-                static Metadata GetMetadata()
-                {
-                    return reflection::MetadataInit(
-                        "KeyValuePair", "bond.proto.KeyValuePair", reflection::Attributes());
-                }
-            };
-        };
-
-        template <typename Key, Encoding KeyEnc, typename Value, Encoding ValueEnc>
-        const Metadata KeyValuePair<Key, KeyEnc, Value, ValueEnc>::Schema::metadata = GetMetadata();
-
-        template <typename Protocols, Encoding KeyEnc, Encoding ValueEnc, typename Key, typename Value, typename Buffer>
-        inline void DeserializeKeyValuePair(Key& key, Value& value, ProtobufBinaryReader<Buffer>& input)
-        {
-            KeyValuePair<Key&, KeyEnc, Value&, ValueEnc> pair = std::tie(key, value);
-
-            Deserialize<Protocols, ProtobufBinaryReader<Buffer>&>(input, pair,
-                GetRuntimeSchema<KeyValuePair<Key, KeyEnc, Value, ValueEnc> >());
-        }
-
-        template <typename Protocols, Encoding KeyEnc, typename Key, typename Value, typename Buffer>
-        inline void DeserializeKeyValuePair(
-            Key& key,
-            Value& value,
-            Encoding value_encoding,
-            ProtobufBinaryReader<Buffer>& input)
-        {
-            switch (value_encoding)
-            {
-            case Encoding::Fixed:
-                DeserializeKeyValuePair<Protocols, KeyEnc, Encoding::Fixed>(key, value, input);
-                break;
-
-            case Encoding::ZigZag:
-                DeserializeKeyValuePair<Protocols, KeyEnc, Encoding::ZigZag>(key, value, input);
-                break;
-
-            default:
-                {
-                    static const auto unavailable = static_cast<Encoding>(0xF);
-                    BOOST_ASSERT(unavailable == Unavailable<Encoding>());
-                    DeserializeKeyValuePair<Protocols, KeyEnc, unavailable>(key, value, input);
-                }
-                break;
-            }
-        }
-
-        template <typename Protocols, typename Key, typename Value, typename Buffer>
-        inline void DeserializeKeyValuePair(
-            Key& key,
-            Encoding key_encoding,
-            Value& value,
-            Encoding value_encoding,
-            ProtobufBinaryReader<Buffer>& input)
-        {
-            switch (key_encoding)
-            {
-            case Encoding::Fixed:
-                DeserializeKeyValuePair<Protocols, Encoding::Fixed>(key, value, value_encoding, input);
-                break;
-
-            case Encoding::ZigZag:
-                DeserializeKeyValuePair<Protocols, Encoding::ZigZag>(key, value, value_encoding, input);
-                break;
-
-            default:
-                {
-                    static const auto unavailable = static_cast<Encoding>(0xF);
-                    BOOST_ASSERT(unavailable == Unavailable<Encoding>());
-                    DeserializeKeyValuePair<Protocols, unavailable>(key, value, value_encoding, input);
-                }
-                break;
-            }
-        }
-
-    } // namespace proto
-    } // namespace detail
-
-
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if_c<is_container<X>::value && !is_map_container<X>::value>::type
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
@@ -954,6 +528,7 @@ namespace bond
         while (element.GetInput().GetSize() != 0);
     }
 
+
     template <typename Protocols, typename Transform, typename T, typename Buffer>
     inline void DeserializeElements(
         const Transform& /*transform*/,
@@ -963,12 +538,14 @@ namespace bond
         BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
     }
 
+
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, 0);
     }
+
 
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::disable_if<is_basic_container<X> >::type
@@ -977,11 +554,13 @@ namespace bond
         DeserializeElements<Protocols>(var, element, 0);
     }
 
+
     template <typename Protocols, typename T, typename Buffer>
     inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
     {
         input.Read(var);
     }
+
 
     template <typename Protocols, typename X, typename Key, typename T, typename Buffer>
     inline void DeserializeMapElements(
@@ -998,6 +577,7 @@ namespace bond
         mapped_at(var, k) = std::move(v);
     }
 
+
     template <typename Protocols, typename Transform, typename Key, typename T, typename Buffer>
     inline void DeserializeMapElements(
         const Transform& /*transform*/,
@@ -1008,12 +588,14 @@ namespace bond
         BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
     }
 
+
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MatchingMapByElement<Protocols>(var, keyType, GetTypeId(element), input, 0);
     }
+
 
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::disable_if<is_basic_container<X> >::type
