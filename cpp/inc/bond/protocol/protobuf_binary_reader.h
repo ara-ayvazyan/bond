@@ -35,8 +35,11 @@ namespace bond
         using Parser = ProtobufParser<ProtobufBinaryReader&>;
         using Writer = ProtobufBinaryWriter<Buffer>;
 
-        explicit ProtobufBinaryReader(const Buffer& input)
+        friend class Parser;
+
+        explicit ProtobufBinaryReader(const Buffer& input, bool strict_match = true)
             : _input{ input },
+              _strict_match{ strict_match },
               _type{ detail::proto::Unavailable<WireType>() },
               _id{ 0 },
               _encoding{ detail::proto::Unavailable<Encoding>() },
@@ -481,6 +484,7 @@ namespace bond
 
 
         Buffer _input;
+        const bool _strict_match;
         WireType _type;
         uint16_t _id;
         Encoding _encoding;

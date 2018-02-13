@@ -19,32 +19,82 @@ namespace bond
     {
         template <BondDataType T>
         typename boost::enable_if_c<(T == BT_BOOL), bool>::type
-        inline MatchWireType(WireType type)
+        inline MatchWireType(WireType type, Encoding encoding, bool /*strict*/ = true)
         {
+            BOOST_VERIFY(encoding == Unavailable<Encoding>());
             return type == WireType::VarInt;
         }
 
         template <BondDataType T>
-        typename boost::enable_if_c<(T == BT_UINT8 || T == BT_UINT16 || T == BT_UINT32 || T == BT_UINT64
-                                    || T == BT_INT8 || T == BT_INT16 || T == BT_INT32 || T == BT_INT64), bool>::type
-        inline MatchWireType(WireType type)
+        typename boost::enable_if_c<(T == BT_UINT8 || T == BT_INT8 || T == BT_UINT16 || T == BT_INT16), bool>::type
+        inline MatchWireType(WireType type, Encoding encoding, bool strict)
         {
-            return type == WireType::VarInt || type == WireType::Fixed64 || type == WireType::Fixed32;
+            if (strict)
+            {
+                switch (encoding)
+                {
+                case Encoding::Fixed:
+                    return type == WireType::Fixed32;
+
+                case Encoding::ZigZag:
+                    BOOST_ASSERT(T == BT_INT8 || T == BT_INT16);
+                default:
+                    return type == WireType::VarInt;
+                }
+            }
+            else
+            {
+                return type == WireType::VarInt || type == WireType::Fixed64 || type == WireType::Fixed32;
+            }
+        }
+
+        template <BondDataType T>
+        typename boost::enable_if_c<(T == BT_UINT32 || T == BT_INT32 || T == BT_UINT64 || T == BT_INT64), bool>::type
+        inline MatchWireType(WireType type, Encoding encoding, bool strict)
+        {
+            if (strict)
+            {
+                switch (encoding)
+                {
+                case Encoding::Fixed:
+                    return type == (T == BT_UINT32 || T == BT_INT32 ? WireType::Fixed32 : WireType::Fixed64);
+
+                case Encoding::ZigZag:
+                    BOOST_ASSERT(T == BT_INT32 || T == BT_INT64);
+                default:
+                    return type == WireType::VarInt;
+                }
+            }
+            else
+            {
+                return type == WireType::VarInt || type == WireType::Fixed64 || type == WireType::Fixed32;
+            }
         }
 
         template <BondDataType T>
         typename boost::enable_if_c<(T == BT_FLOAT || T == BT_DOUBLE), bool>::type
-        inline MatchWireType(WireType type)
+        inline MatchWireType(WireType type, Encoding encoding, bool strict)
         {
-            return type == WireType::Fixed64 || type == WireType::Fixed32;
+            BOOST_VERIFY(encoding == Encoding::Fixed);
+
+            if (strict)
+            {
+                return type == (T == BT_FLOAT ? WireType::Fixed32 : WireType::Fixed64);
+            }
+            else
+            {
+                return type == WireType::Fixed64 || type == WireType::Fixed32;
+            }
         }
 
         template <BondDataType T>
         typename boost::enable_if_c<(T == BT_STRING || T == BT_WSTRING || T == BT_STRUCT), bool>::type
-        inline MatchWireType(WireType type)
+        inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
         {
+            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
             return type == WireType::LengthDelimited;
         }
+
 
         template <typename FieldT, typename Transform, typename T>
         typename boost::enable_if<is_fast_path_field<FieldT, Transform>, bool>::type
@@ -115,10 +165,12 @@ namespace bond
     class ProtobufParser
     {
         using WireType = detail::proto::WireType;
+        using Encoding = detail::proto::Encoding;
 
     public:
         ProtobufParser(Input input, bool base)
-            : _input{ input }
+            : _input{ input },
+              _strict_match{ input._strict_match }
         {
             BOOST_ASSERT(!base);
         }
@@ -138,15 +190,17 @@ namespace bond
         class WireTypeFieldBinder
         {
         public:
-            WireTypeFieldBinder(WireType type, const Transform& transform)
+            WireTypeFieldBinder(WireType type, Encoding encoding, bool strict_match, const Transform& transform)
                 : _type{ type },
+                  _encoding{ encoding },
+                  _strict_match{ strict_match },
                   _transform{ transform }
             {}
 
             template <typename T>
             bool Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
             {
-                if (detail::proto::MatchWireType<get_type_id<T>::value>(_type))
+                if (detail::proto::MatchWireType<get_type_id<T>::value>(_type, _encoding, _strict_match))
                 {
                     _transform.Field(id, metadata, value);
                     return true;
@@ -157,14 +211,18 @@ namespace bond
 
         private:
             const WireType _type;
+            const Encoding _encoding;
+            const bool _strict_match;
             const Transform& _transform;
         };
 
         template <typename Transform>
-        WireTypeFieldBinder<Transform> BindWireTypeField(WireType type, const Transform& transform)
+        WireTypeFieldBinder<Transform> BindWireTypeField(
+            WireType type, Encoding encoding, bool strict_match, const Transform& transform)
         {
-            return WireTypeFieldBinder<Transform>{ type, transform };
+            return WireTypeFieldBinder<Transform>{ type, encoding, strict_match, transform };
         }
+
 
         // use compile-time schema
         template <typename Schema, typename Transform>
@@ -230,9 +288,10 @@ namespace bond
         typename boost::enable_if<is_basic_type<typename T::field_type>, bool>::type
         Field(const Transform& transform, WireType type)
         {
-            _input.SetEncoding(detail::proto::ReadEncoding(get_type_id<typename T::field_type>::value, &T::metadata));
+            Encoding encoding = detail::proto::ReadEncoding(get_type_id<typename T::field_type>::value, &T::metadata);
+            _input.SetEncoding(encoding);
 
-            if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type))
+            if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type, encoding, _strict_match))
             {
                 detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
                 return true;
@@ -378,9 +437,10 @@ namespace bond
                     }
                     else
                     {
-                        _input.SetEncoding(detail::proto::ReadEncoding(field->type.id, &field->metadata));
+                        Encoding encoding = detail::proto::ReadEncoding(field->type.id, &field->metadata);
+                        _input.SetEncoding(encoding);
 
-                        if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, transform), _input))
+                        if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, encoding, _strict_match, transform), _input))
                         {
                             continue;
                         }
@@ -393,6 +453,7 @@ namespace bond
 
 
         Input _input;
+        const bool _strict_match;
     };
 
 } // namespace bond
