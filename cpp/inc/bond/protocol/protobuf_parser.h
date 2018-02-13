@@ -64,6 +64,53 @@ namespace bond
     } // namespace detail
 
 
+    template <typename T>
+    class UnorderedRequiredFieldValiadator
+    {
+    protected:
+        template <typename U>
+        struct rebind
+        {
+            using type = UnorderedRequiredFieldValiadator<U>;
+        };
+
+        void Begin(const T& /*var*/) const
+        {
+            // TODO:
+        }
+
+        template <typename Head>
+        typename boost::enable_if<std::is_same<typename Head::field_modifier,
+                                               reflection::required_field_modifier> >::type
+        Validate() const
+        {
+            // TODO:
+        }
+
+        template <typename Schema>
+        typename boost::enable_if_c<next_required_field<typename Schema::fields>::value
+                                    != invalid_field_id>::type
+        Validate() const
+        {
+            // TODO:
+        }
+
+        template <typename Head>
+        typename boost::disable_if<std::is_same<typename Head::field_modifier,
+                                                reflection::required_field_modifier> >::type
+        Validate() const
+        {}
+
+        template <typename Schema>
+        typename boost::disable_if_c<next_required_field<typename Schema::fields>::value
+                                    != invalid_field_id>::type
+        Validate() const
+        {}
+
+    private:
+    };
+
+
     template <typename Input>
     class ProtobufParser
     {

@@ -9,7 +9,6 @@
 #include "detail/protobuf_utils.h"
 #include "protobuf_parser.h"
 #include "detail/simple_array.h"
-#include <bond/core/detail/omit_default.h>
 
 #include <boost/locale.hpp>
 #include <boost/shared_ptr.hpp>
@@ -493,6 +492,17 @@ namespace bond
 
     namespace detail
     {
+        template <typename Protocols, typename T, typename X, typename Buffer>
+        bool ApplyTransform(const bond::To<T, Protocols>& transform, const bonded<X, ProtobufBinaryReader<Buffer>&>& bonded)
+        {
+            return ApplyTransform<Protocols>(bond::To<T, Protocols, UnorderedRequiredFieldValiadator<T> >{ transform }, bonded);
+        }
+
+    } // namesace detail
+
+
+    namespace detail
+    {
         template <typename Buffer>
         inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& /*input*/, uint32_t /*size*/)
         {
@@ -624,7 +634,9 @@ namespace bond
     template <typename Protocols, typename T, typename Buffer>
     inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
     {
-        input.Read(var);
+        blob value;
+        input.Read(value);
+        var = merge(var, value);
     }
 
 
