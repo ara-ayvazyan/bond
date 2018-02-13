@@ -128,11 +128,7 @@ namespace proto
             break;
 
         default:
-            {
-                static const auto unavailable = static_cast<Encoding>(0xF);
-                BOOST_ASSERT(unavailable == Unavailable<Encoding>());
-                DeserializeKeyValuePair<Protocols, KeyEnc, unavailable>(key, value, input);
-            }
+            DeserializeKeyValuePair<Protocols, KeyEnc, Unavailable<Encoding>::value>(key, value, input);
             break;
         }
     }
@@ -153,11 +149,7 @@ namespace proto
             break;
 
         default:
-            {
-                static const auto unavailable = static_cast<Encoding>(0xF);
-                BOOST_ASSERT(unavailable == Unavailable<Encoding>());
-                DeserializeKeyValuePair<Protocols, unavailable>(key, value, value_encoding, input);
-            }
+            DeserializeKeyValuePair<Protocols, Unavailable<Encoding>::value>(key, value, value_encoding, input);
             break;
         }
     }

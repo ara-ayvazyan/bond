@@ -21,7 +21,7 @@ namespace bond
         typename boost::enable_if_c<(T == BT_BOOL), bool>::type
         inline MatchWireType(WireType type, Encoding encoding, bool /*strict*/ = true)
         {
-            BOOST_VERIFY(encoding == Unavailable<Encoding>());
+            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
             return type == WireType::VarInt;
         }
 

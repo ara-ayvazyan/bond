@@ -40,10 +40,10 @@ namespace bond
         explicit ProtobufBinaryReader(const Buffer& input, bool strict_match = true)
             : _input{ input },
               _strict_match{ strict_match },
-              _type{ detail::proto::Unavailable<WireType>() },
+              _type{ detail::proto::Unavailable<WireType>::value },
               _id{ 0 },
-              _encoding{ detail::proto::Unavailable<Encoding>() },
-              _key_encoding{ detail::proto::Unavailable<Encoding>() },
+              _encoding{ detail::proto::Unavailable<Encoding>::value },
+              _key_encoding{ detail::proto::Unavailable<Encoding>::value },
               _size{ 0 },
               _lengths{ boost::make_shared<detail::SimpleArray<uint32_t> >() }
         {}
@@ -108,7 +108,7 @@ namespace bond
 
         void Read(bool& value)
         {
-            BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
+            BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>::value);
 
             switch (_type)
             {
@@ -132,7 +132,7 @@ namespace bond
         Read(T& value)
         {
             BOOST_STATIC_ASSERT(sizeof(T) <= sizeof(uint64_t));
-            //BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>());
+            //BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>::value);
 
             switch (_type)
             {
@@ -184,7 +184,7 @@ namespace bond
         typename boost::enable_if<std::is_floating_point<T> >::type
         Read(T& value)
         {
-            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>());
+            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>::value);
 
             switch (_type)
             {
@@ -434,7 +434,7 @@ namespace bond
 
                 _type = static_cast<WireType>(raw_type);
                 _id = static_cast<uint16_t>(raw_id);
-                _encoding = _key_encoding = detail::proto::Unavailable<Encoding>();
+                _encoding = _key_encoding = detail::proto::Unavailable<Encoding>::value;
 
                 return true;
             }
