@@ -6,10 +6,7 @@
 #include "protobuf_writer_reflection.h"
 #include "protobuf_writer.pb.h"
 
-#include <bond/core/tuple.h>
 #include <bond/protocol/protobuf_binary_reader.h>
-
-#include <google/protobuf/util/message_differencer.h>
 
 #include <boost/test/debug.hpp>
 #include <boost/test/unit_test.hpp>

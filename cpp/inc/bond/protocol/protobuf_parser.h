@@ -127,9 +127,10 @@ namespace bond
         bool Apply(const Transform& transform, const Schema& schema)
         {
             detail::StructBegin(_input, false);
-            bool result = Read(schema, transform);
+            Read(schema, transform);
             detail::StructEnd(_input, false);
-            return result;
+
+            return false;
         }
 
     private:
@@ -167,28 +168,26 @@ namespace bond
 
         // use compile-time schema
         template <typename Schema, typename Transform>
-        bool Read(const Schema&, const Transform& transform)
+        void Read(const Schema&, const Transform& transform)
         {
             BOOST_STATIC_ASSERT(std::is_same<typename Schema::base, no_base>::value);
 
             transform.Begin(Schema::metadata);
-            bool done = ReadFields(Schema{}, transform);
+            ReadFields(Schema{}, transform);
             transform.End();
-            return done;
         }
 
         template <typename Schema, typename Transform>
-        bool ReadFields(const Schema&, const Transform& transform)
+        void ReadFields(const Schema&, const Transform& transform)
         {
             WireType type;
             uint16_t id;
 
             if (_input.ReadFieldBegin(type, id))
             {
-                ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id);
+                while (ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id))
+                {}
             }
-
-            return false;
         }
 
         template <typename Schema, typename Fields, typename Transform>
@@ -196,32 +195,25 @@ namespace bond
         {
             using Head = typename boost::mpl::deref<Fields>::type;
 
-            if (!TryField<Head>(transform, type, id))
+            do
             {
-                if (Head::id < id)
+                if (Head::id == id)
+                {
+                    if (!Field<Head>(transform, type))
+                    {
+                        transform.UnknownField(Head::id, value<void, Input>{ _input, BT_UNAVAILABLE });
+                    }
+                }
+                else if (Head::id < id)
                 {
                     return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id);
                 }
                 else // Head::id > id
                 {
-                    transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
+                    return true;
                 }
             }
-
-            while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id))
-            {
-                if (!TryField<Head>(transform, type, id))
-                {
-                    if (Head::id < id)
-                    {
-                        return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id);
-                    }
-                    else // Head::id > id
-                    {
-                        return ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id);
-                    }
-                }
-            }
+            while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id));
 
             return false;
         }
@@ -230,26 +222,9 @@ namespace bond
         bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform& transform, WireType& type, uint16_t& id)
         {
             transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
-
-            return ReadFields<Schema>(typename boost::mpl::begin<typename Schema::fields>::type{}, transform, type, id);
+            return _input.ReadFieldEnd(), _input.ReadFieldBegin(type, id);
         }
 
-
-        template <typename T, typename Transform>
-        bool TryField(const Transform& transform, WireType type, uint16_t id)
-        {
-            if (T::id == id)
-            {
-                if (!Field<T>(transform, type))
-                {
-                    transform.UnknownField(T::id, value<void, Input>{ _input, BT_UNAVAILABLE });
-                }
-
-                return true;
-            }
-
-            return false;
-        }
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_basic_type<typename T::field_type>, bool>::type
@@ -340,7 +315,7 @@ namespace bond
 
         // use runtime schema
         template <typename Transform>
-        bool Read(const RuntimeSchema& schema, const Transform& transform)
+        void Read(const RuntimeSchema& schema, const Transform& transform)
         {
             if (schema.HasBase())
             {
@@ -348,13 +323,12 @@ namespace bond
             }
 
             transform.Begin(schema.GetStruct().metadata);
-            bool done = ReadFields(schema, transform);
+            ReadFields(schema, transform);
             transform.End();
-            return done;
         }
 
         template <typename Transform>
-        bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
+        void ReadFields(const RuntimeSchema& schema, const Transform& transform)
         {
             WireType type;
             uint16_t id;
@@ -415,8 +389,6 @@ namespace bond
 
                 transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
             }
-
-            return false;
         }
 
 
