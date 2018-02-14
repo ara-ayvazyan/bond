@@ -133,16 +133,9 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs)
     bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
 
     // Compile-time schema
-    {
-        auto bond_struct2 = bond::Deserialize<Bond>(reader);
-        BOOST_CHECK((bond_struct == bond_struct2));
-    }
-
+    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
     // Runtime schema
-    {
-        auto bond_struct2 = bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>());
-        BOOST_CHECK((bond_struct == bond_struct2));
-    }
+    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
 }
 
 template <typename Proto, typename Bond>
@@ -153,79 +146,145 @@ void CheckBinaryFormat()
     CheckBinaryFormat<Proto>({ InitRandom<Bond>(), InitRandom<Bond>(), InitRandom<Bond>() });
 }
 
-template <typename T>
-class ToNoUnknowns : public bond::To<T>
-{
-public:
-    ToNoUnknowns(T& var)
-        : bond::To<T>(var)
-    {}
+//template <typename T>
+//class ToNoUnknowns : public bond::To<T>
+//{
+//public:
+//    ToNoUnknowns(T& var)
+//        : bond::To<T>(var)
+//    {}
+//
+//    template <typename X>
+//    void UnknownField(uint16_t /*id*/, const X& /*value*/) const
+//    {
+//        BOND_THROW(bond::CoreException, "Unknown field");
+//    }
+//};
 
-    template <typename X>
-    void UnknownField(uint16_t /*id*/, const X& /*value*/) const
-    {
-        BOND_THROW(bond::CoreException, "Unknown field");
-    }
-};
+//template <typename Bond>
+//void CheckUnsupportedType()
+//{
+//    auto bond_struct = InitRandom<Bond>();
+//
+//    if (bond_struct != Bond{})
+//    {
+//        Proto proto_struct;
+//        bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
+//
+//        auto str = proto_struct.SerializeAsString();
+//
+//        bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
+//        bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+//
+//        Bond obj;
+//        BOOST_CHECK_THROW(
+//            bond::Apply(
+//                ToNoUnknowns<Bond>(obj),
+//                bond::bonded<void, bond::ProtobufBinaryReader<bond::InputBuffer>&>(
+//                    reader, bond::GetRuntimeSchema<Bond>())),
+//            bond::CoreException);
+//    }
+//}
 
 template <typename Bond>
+void DeserializeCheckThrow(const bond::ProtobufBinaryReader<bond::InputBuffer>& reader, std::true_type)
+{
+    BOOST_CHECK_THROW(bond::Deserialize<Bond>(reader), bond::CoreException);
+}
+
+template <typename Bond>
+void DeserializeCheckThrow(const bond::ProtobufBinaryReader<bond::InputBuffer>& /*reader*/, std::false_type)
+{}
+
+template <typename Bond, bool RuntimeOnly = false, typename Proto>
+void CheckUnsupportedType(const Proto& proto_struct)
+{
+    auto str = proto_struct.SerializeAsString();
+
+    bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
+    bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+
+    // Compile-time schema
+    DeserializeCheckThrow<Bond>(reader, std::integral_constant<bool, !RuntimeOnly>{});
+    // Runtime schema
+    BOOST_CHECK_THROW(bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>()), bond::CoreException);
+}
+
+template <typename Proto, typename Bond, bool RuntimeOnly = false>
 void CheckUnsupportedType()
 {
     auto bond_struct = InitRandom<Bond>();
 
-    if (bond_struct != Bond{})
-    {
-        Proto proto_struct;
-        bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
+    Proto proto_struct;
+    bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
 
-        auto str = proto_struct.SerializeAsString();
+    CheckUnsupportedType<Bond, RuntimeOnly>(proto_struct);
+}
 
-        bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
-        bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+template <typename Proto>
+void set_value(Proto& value)
+{
+    value.set_value(1);
+}
 
-        Bond obj;
-        BOOST_CHECK_THROW(
-            bond::Apply(
-                ToNoUnknowns<Bond>(obj),
-                bond::bonded<void, bond::ProtobufBinaryReader<bond::InputBuffer>&>(
-                    reader, bond::GetRuntimeSchema<Bond>())),
-            bond::CoreException);
-    }
+void set_value(google::protobuf::BytesValue& value)
+{
+    value.set_value("1");
+}
+
+template <typename Bond, typename Proto, bool RuntimeOnly = false>
+void CheckUnsupportedValueType()
+{
+    Proto value;
+    set_value(value);
+    CheckUnsupportedType<Bond, RuntimeOnly>(value);
 }
 
 using blob_types = boost::mpl::list<bond::blob, std::vector<int8_t>, bond::nullable<int8_t> >;
 
 BOOST_AUTO_TEST_CASE(InheritanceTests)
 {
-    //CheckUnsupportedType<unittest::Derived>();
+    CheckUnsupportedValueType<unittest::Derived, google::protobuf::Int32Value, true>();
 }
 
-BOOST_AUTO_TEST_CASE(FieldOrdinalTests)
+BOOST_AUTO_TEST_CASE(CorruptedTagTests)
 {
-    /*CheckUnsupportedType<unittest::Field0>();
-    CheckUnsupportedType<unittest::Field19000>();
-    CheckUnsupportedType<unittest::Field19111>();
-    CheckUnsupportedType<unittest::Field19999>();*/
+    using bond::detail::proto::WireType;
+    using Bond = bond::Box<uint32_t>;
+
+    for (uint32_t id : { uint32_t(1), uint32_t((std::numeric_limits<uint16_t>::max)() + 1) })
+        for (WireType type : { WireType::VarInt, WireType(7) })
+            if (id != 1 || type != WireType::VarInt)
+            {
+                bond::OutputBuffer output;
+                output.WriteVariableUnsigned((uint32_t(id) << 3) | uint32_t(type));
+                bond::ProtobufBinaryReader<bond::InputBuffer> reader(output.GetBuffer());
+
+                // Compile-time schema
+                BOOST_CHECK_THROW(bond::Deserialize<Bond>(reader), bond::CoreException);
+                // Runtime schema
+                BOOST_CHECK_THROW(bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>()), bond::CoreException);
+            }
 }
 
 BOOST_AUTO_TEST_CASE(IntegerTests)
 {
     CheckBinaryFormat<unittest::proto::Integers, unittest::Integers>();
 
-    /*CheckUnsupportedType<unittest::BoxWrongEncoding<uint8_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<uint16_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<uint32_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<uint64_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<int8_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<int16_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<int32_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<int64_t> >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<unittest::Enum> >();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<uint8_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<uint16_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<uint32_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<uint64_t>, google::protobuf::UInt64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<int8_t>, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<int16_t>, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<int32_t>, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<int64_t>, google::protobuf::Int64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<unittest::Enum>, google::protobuf::Int32Value>();
 
-    CheckUnsupportedType<unittest::BoxZigZag<uint8_t> >();
-    CheckUnsupportedType<unittest::BoxZigZag<uint16_t> >();
-    CheckUnsupportedType<unittest::BoxZigZag<uint32_t> >();
-    CheckUnsupportedType<unittest::BoxZigZag<uint64_t> >();*/
+    CheckUnsupportedValueType<unittest::BoxZigZag<uint8_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<uint16_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<uint32_t>, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<uint64_t>, google::protobuf::UInt64Value>();
 }
 
 BOOST_AUTO_TEST_CASE(StringTests)
@@ -245,31 +304,31 @@ BOOST_AUTO_TEST_CASE(IntegerContainerTests)
     CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
 
-    /*CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<uint64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<int64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<vector<unittest::Enum> > >();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint64_t> >, google::protobuf::UInt64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<int16_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<int32_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<int64_t> >, google::protobuf::Int64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<unittest::Enum> >, google::protobuf::Int32Value>();
 
-    CheckUnsupportedType<unittest::BoxZigZag<vector<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<vector<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<vector<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<vector<uint64_t> > >();
+    CheckUnsupportedValueType<unittest::BoxZigZag<vector<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<vector<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<vector<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<vector<uint64_t> >, google::protobuf::UInt64Value>();
 
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<uint64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<int64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<unittest::Enum> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<bool> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<float> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<vector<double> > >();*/
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<uint64_t> >, google::protobuf::UInt64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<int16_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<int32_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<int64_t> >, google::protobuf::Int64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<unittest::Enum> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<bool> >, google::protobuf::BoolValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<float> >, google::protobuf::FloatValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<vector<double> >, google::protobuf::DoubleValue>();
 }
 
 BOOST_AUTO_TEST_CASE(IntegerSetContainerTests)
@@ -277,33 +336,33 @@ BOOST_AUTO_TEST_CASE(IntegerSetContainerTests)
     CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersSetContainer>();
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersSetContainer>();
 
-    /*CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<uint64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<int64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongEncoding<set<unittest::Enum> > >();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<uint64_t> >, google::protobuf::UInt64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<int8_t> >, google::protobuf::BytesValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<int16_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<int32_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<int64_t> >, google::protobuf::Int64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<unittest::Enum> >, google::protobuf::Int32Value>();
 
-    CheckUnsupportedType<unittest::BoxZigZag<set<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<set<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<set<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxZigZag<set<uint64_t> > >();
+    CheckUnsupportedValueType<unittest::BoxZigZag<set<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<set<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<set<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxZigZag<set<uint64_t> >, google::protobuf::UInt64Value>();
 
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<uint64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<int8_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<int16_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<int32_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<int64_t> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<unittest::Enum> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<bool> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<float> > >();
-    CheckUnsupportedType<unittest::BoxWrongPacking<set<double> > >();*/
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<uint8_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<uint16_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<uint32_t> >, google::protobuf::UInt32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<uint64_t> >, google::protobuf::UInt64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<int8_t> >, google::protobuf::BytesValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<int16_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<int32_t> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<int64_t> >, google::protobuf::Int64Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<unittest::Enum> >, google::protobuf::Int32Value>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<bool> >, google::protobuf::BoolValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<float> >, google::protobuf::FloatValue>();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<double> >, google::protobuf::DoubleValue>();
 }
 
 BOOST_AUTO_TEST_CASE(StringContainerTests)
@@ -356,6 +415,7 @@ BOOST_AUTO_TEST_CASE(NestedStructTests)
         unittest::proto::NestedStruct,
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
+    // TODO:
     /*unittest::BoxWrongPackingWrongEncoding<bond::bonded<unittest::Integers> > box;
     box.value = bond::bonded<unittest::Integers>{ InitRandom<unittest::Integers>() };
     CheckBinaryFormat<unittest::proto::NestedStruct>(box);*/
