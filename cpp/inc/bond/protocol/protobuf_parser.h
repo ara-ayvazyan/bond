@@ -88,11 +88,116 @@ namespace bond
         }
 
         template <BondDataType T>
-        typename boost::enable_if_c<(T == BT_STRING || T == BT_WSTRING || T == BT_STRUCT), bool>::type
+        typename boost::enable_if_c<(T == BT_STRING || T == BT_WSTRING || T == BT_STRUCT || T == BT_MAP), bool>::type
         inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
         {
             BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
             return type == WireType::LengthDelimited;
+        }
+
+        template <BondDataType T>
+        typename boost::enable_if_c<(T == BT_LIST), bool>::type
+        inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
+        {
+            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
+            return type == WireType::VarInt;
+        }
+
+        template <BondDataType T>
+        typename boost::enable_if_c<(T == BT_SET), bool>::type
+        inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
+        {
+            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
+            return type == WireType::VarInt;
+        }
+
+
+        template <BondDataType T>
+        inline bool MatchWireType(WireType type, Encoding encoding, Packing packing, bool strict)
+        {
+            switch (packing)
+            {
+            case Packing::False:
+                return MatchWireType<T>(type, encoding, strict);
+
+            default:
+                return type == WireType::LengthDelimited;
+            }
+        }
+
+
+        inline bool MatchWireType(BondDataType bond_type, WireType type, Encoding encoding, bool strict)
+        {
+            switch (bond_type)
+            {
+            case BT_BOOL:
+                return MatchWireType<BT_BOOL>(type, encoding, strict);
+
+            case BT_UINT8:
+                return MatchWireType<BT_UINT8>(type, encoding, strict);
+
+            case BT_UINT16:
+                return MatchWireType<BT_UINT16>(type, encoding, strict);
+
+            case BT_UINT32:
+                return MatchWireType<BT_UINT32>(type, encoding, strict);
+
+            case BT_UINT64:
+                return MatchWireType<BT_UINT64>(type, encoding, strict);
+
+            case BT_INT8:
+                return MatchWireType<BT_INT8>(type, encoding, strict);
+
+            case BT_INT16:
+                return MatchWireType<BT_INT16>(type, encoding, strict);
+
+            case BT_INT32:
+                return MatchWireType<BT_INT32>(type, encoding, strict);
+
+            case BT_INT64:
+                return MatchWireType<BT_INT64>(type, encoding, strict);
+
+            case BT_FLOAT:
+                return MatchWireType<BT_FLOAT>(type, encoding, strict);
+
+            case BT_DOUBLE:
+                return MatchWireType<BT_DOUBLE>(type, encoding, strict);
+
+            case BT_STRING:
+                return MatchWireType<BT_STRING>(type, encoding, strict);
+
+            case BT_WSTRING:
+                return MatchWireType<BT_WSTRING>(type, encoding, strict);
+
+            case BT_STRUCT:
+                return MatchWireType<BT_STRUCT>(type, encoding, strict);
+
+            case BT_LIST:
+                return MatchWireType<BT_LIST>(type, encoding, strict);
+
+            case BT_SET:
+                return MatchWireType<BT_SET>(type, encoding, strict);
+
+            case BT_MAP:
+                return MatchWireType<BT_MAP>(type, encoding, strict);
+
+            default:
+                BOOST_ASSERT(false);
+                return false;
+            }
+        }
+
+
+        inline bool MatchWireType(BondDataType bond_type, WireType type, Encoding encoding, Packing packing, bool strict)
+        {
+            switch (packing)
+            {
+            case Packing::False:
+                return MatchWireType(bond_type, type, encoding, strict);
+
+            default:
+                return type == WireType::LengthDelimited;
+            }
         }
 
 
@@ -109,6 +214,29 @@ namespace bond
         {
             return transform.Field(FieldT::id, FieldT::metadata, value);
         }
+
+
+        template <typename T, typename Enable = void> struct
+        is_blob_type
+            : std::false_type {};
+
+        template <typename T> struct
+        is_blob_type<T, typename boost::enable_if<is_list_container<T> >::type>
+            : std::integral_constant<bool,
+                (get_type_id<typename element_type<T>::type>::value == BT_INT8)> {};
+
+
+        template <typename T, typename Enable = void> struct
+        is_nested_blob_type
+            : std::false_type {};
+
+        template <typename T> struct
+        is_nested_blob_type<T, typename boost::enable_if<is_list_container<T> >::type>
+            : is_blob_type<typename element_type<T>::type> {};
+
+        template <typename T> struct
+        is_nested_blob_type<T, typename boost::enable_if<is_set_container<T> >::type>
+            : is_blob_type<typename element_type<T>::type> {};
 
     } // namespace proto
     } // namespace detail
@@ -166,6 +294,7 @@ namespace bond
     {
         using WireType = detail::proto::WireType;
         using Encoding = detail::proto::Encoding;
+        using Packing = detail::proto::Packing;
 
     public:
         ProtobufParser(Input input, bool base)
@@ -200,6 +329,8 @@ namespace bond
             template <typename T>
             bool Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
             {
+                BOOST_STATIC_ASSERT(is_basic_type<T>::value);
+
                 if (detail::proto::MatchWireType<get_type_id<T>::value>(_type, _encoding, _strict_match))
                 {
                     _transform.Field(id, metadata, value);
@@ -289,6 +420,7 @@ namespace bond
         Field(const Transform& transform, WireType type)
         {
             Encoding encoding = detail::proto::ReadEncoding(get_type_id<typename T::field_type>::value, &T::metadata);
+
             _input.SetEncoding(encoding);
 
             if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type, encoding, _strict_match))
@@ -305,7 +437,7 @@ namespace bond
         typename boost::enable_if<is_bond_type<typename T::field_type>, bool>::type
         Field(const Transform& transform, WireType type)
         {
-            if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type))
+            if (detail::proto::MatchWireType<BT_STRUCT>(type))
             {
                 detail::proto::Field<T>(transform, bonded<typename T::field_type, Input&>{ _input });
                 return true;
@@ -316,38 +448,44 @@ namespace bond
 
 
         template <typename T, typename Transform>
-        typename boost::enable_if<is_list_container<typename T::field_type>, bool>::type
+        typename boost::enable_if_c<is_list_container<typename T::field_type>::value
+                                    || is_set_container<typename T::field_type>::value, bool>::type
         Field(const Transform& transform, WireType type)
         {
+            bool matched;
+
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4127) // C4127: conditional expression is constant
 #endif
-            if (get_type_id<typename element_type<typename T::field_type>::type>::value != BT_INT8)
-            {
-                _input.SetEncoding(detail::proto::ReadEncoding(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata));
-            }
+            if (detail::proto::is_blob_type<typename T::field_type>::value
+                || detail::proto::is_nested_blob_type<typename T::field_type>::value)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+            {
+                matched = true;
+            }
+            else
+            {
+                Packing packing = _strict_match
+                    ? detail::proto::ReadPacking(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata)
+                    : detail::proto::Unavailable<Packing>::value;
 
-            // TODO: match by element type
-            detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
+                Encoding encoding = detail::proto::ReadEncoding(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata);
 
-            return true;
-        }
+                _input.SetEncoding(encoding);
 
+                matched = detail::proto::MatchWireType<get_type_id<typename element_type<typename T::field_type>::type>::value>(type, encoding, packing, _strict_match);
+            }
 
-        template <typename T, typename Transform>
-        typename boost::enable_if<is_set_container<typename T::field_type>, bool>::type
-        Field(const Transform& transform, WireType type)
-        {
-            _input.SetEncoding(detail::proto::ReadEncoding(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata));
+            if (matched)
+            {
+                detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
+                return true;
+            }
 
-            // TODO: match by element type
-            detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
-
-            return true;
+            return false;
         }
 
 
@@ -355,7 +493,7 @@ namespace bond
         typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
         Field(const Transform& transform, WireType type)
         {
-            if (type == WireType::LengthDelimited)
+            if (detail::proto::MatchWireType<BT_MAP>(type))
             {
                 _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(
                     get_type_id<typename element_type<typename T::field_type>::type::first_type>::value, &T::metadata));
@@ -398,31 +536,46 @@ namespace bond
                 {
                     if (field->type.id == BT_STRUCT)
                     {
-                        switch (type)
+                        if (detail::proto::MatchWireType<BT_STRUCT>(type))
                         {
-                        case WireType::LengthDelimited:
                             transform.Field(id, field->metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, *field } });
                             continue;
                         }
                     }
                     else if (field->type.id == BT_LIST || field->type.id == BT_SET)
                     {
-                        // TODO: match by element type
-
                         BOOST_ASSERT(field->type.element.hasvalue());
-                        if (!(field->type.id == BT_LIST && field->type.element->id == BT_INT8)) // !blob
+
+                        bool matched;
+
+                        if ((field->type.id == BT_LIST && field->type.element->id == BT_INT8)                       // blob
+                            || (field->type.element->id == BT_LIST && field->type.element->element->id == BT_INT8)) // nested blobs
                         {
-                            _input.SetEncoding(detail::proto::ReadEncoding(field->type.element->id, &field->metadata));
+                            matched = true;
+                        }
+                        else
+                        {
+                            Packing packing = _strict_match
+                                ? detail::proto::ReadPacking(field->type.element->id, &field->metadata)
+                                : detail::proto::Unavailable<Packing>::value;
+
+                            Encoding encoding = detail::proto::ReadEncoding(field->type.element->id, &field->metadata);
+
+                            _input.SetEncoding(encoding);
+
+                            matched = detail::proto::MatchWireType(field->type.element->id, type, encoding, packing, _strict_match);
                         }
 
-                        transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                        continue;
+                        if (matched)
+                        {
+                            transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
+                            continue;
+                        }
                     }
                     else if (field->type.id == BT_MAP)
                     {
-                        switch (type)
+                        if (detail::proto::MatchWireType<BT_MAP>(type))
                         {
-                        case WireType::LengthDelimited:
                             // TODO: match by element type
 
                             BOOST_ASSERT(field->type.key.hasvalue());
@@ -438,9 +591,15 @@ namespace bond
                     else
                     {
                         Encoding encoding = detail::proto::ReadEncoding(field->type.id, &field->metadata);
+
                         _input.SetEncoding(encoding);
 
-                        if (detail::BasicTypeField(id, field->metadata, field->type.id, BindWireTypeField(type, encoding, _strict_match, transform), _input))
+                        if (detail::BasicTypeField(
+                                id,
+                                field->metadata,
+                                field->type.id,
+                                BindWireTypeField(type, encoding, _strict_match, transform),
+                                _input))
                         {
                             continue;
                         }
