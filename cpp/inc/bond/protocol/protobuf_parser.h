@@ -493,6 +493,8 @@ namespace bond
         typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
         Field(const Transform& transform, WireType type)
         {
+            BOOST_STATIC_ASSERT(!std::is_floating_point<typename T::field_type::key_type>::value);
+
             if (detail::proto::MatchWireType<BT_MAP>(type))
             {
                 _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(
@@ -500,7 +502,6 @@ namespace bond
                 _input.SetEncoding(detail::proto::ReadValueEncoding(
                     get_type_id<typename element_type<typename T::field_type>::type::second_type>::value, &T::metadata));
 
-                // TODO: match by element type
                 detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
 
                 return true;
@@ -576,8 +577,6 @@ namespace bond
                     {
                         if (detail::proto::MatchWireType<BT_MAP>(type))
                         {
-                            // TODO: match by element type
-
                             BOOST_ASSERT(field->type.key.hasvalue());
                             _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
 

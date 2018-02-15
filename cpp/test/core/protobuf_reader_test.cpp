@@ -463,8 +463,12 @@ BOOST_AUTO_TEST_CASE(IntegerMapKeyTests)
 {
     CheckBinaryFormat<unittest::proto::IntegerMapKeys, unittest::IntegerMapKeys>();
 
-    /*CheckUnsupportedType<unittest::Box<std::map<float, uint32_t> > >();
-    CheckUnsupportedType<unittest::Box<std::map<double, uint32_t> > >();*/
+    auto bond_struct = InitRandom<unittest::Integers>();
+    unittest::proto::NestedStruct proto_struct;
+    bond::Apply(bond::detail::proto::ToProto{ *proto_struct.mutable_value() }, bond_struct);
+
+    CheckUnsupportedType<unittest::Box<std::map<float, uint32_t> >, true>(proto_struct);
+    CheckUnsupportedType<unittest::Box<std::map<double, uint32_t> >, true>(proto_struct);
 }
 
 BOOST_AUTO_TEST_CASE(StringMapKeyTests)
