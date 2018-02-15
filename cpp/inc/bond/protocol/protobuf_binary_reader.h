@@ -132,7 +132,6 @@ namespace bond
         Read(T& value)
         {
             BOOST_STATIC_ASSERT(sizeof(T) <= sizeof(uint64_t));
-            //BOOST_ASSERT(is_signed_int<T>::value || _encoding == detail::proto::Unavailable<Encoding>::value);
 
             switch (_type)
             {
@@ -184,7 +183,7 @@ namespace bond
         typename boost::enable_if<std::is_floating_point<T> >::type
         Read(T& value)
         {
-            //BOOST_ASSERT(_encoding == detail::proto::Unavailable<Encoding>::value);
+            BOOST_ASSERT(_encoding == Encoding::Fixed);
 
             switch (_type)
             {
@@ -210,19 +209,12 @@ namespace bond
         typename boost::enable_if<is_string<T> >::type
         Read(T& value)
         {
-            switch (_type)
-            {
-            case WireType::LengthDelimited:
-                BOOST_ASSERT(_size != 0);
-                detail::ReadStringData(_input, value, _size);
-                Consume(_size);
-                _size = 0;
-                break;
+            BOOST_ASSERT(_type == WireType::LengthDelimited);
+            BOOST_ASSERT(_size != 0);
 
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
+            detail::ReadStringData(_input, value, _size);
+            Consume(_size);
+            _size = 0;
         }
 
         template <typename T>
@@ -285,7 +277,6 @@ namespace bond
         void Consume(uint32_t size)
         {
             BOOST_ASSERT(_lengths && !_lengths->empty());
-
             uint32_t& length = _lengths->top(std::nothrow);
 
             if (length >= size)
@@ -404,7 +395,6 @@ namespace bond
         bool ReadTag()
         {
             BOOST_ASSERT(_lengths && !_lengths->empty());
-
             if ((_lengths->top(std::nothrow) != 0) && !_input.IsEof())
             {
                 uint64_t tag;
@@ -570,9 +560,9 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename X, typename Allocator, bool useValue, typename T, typename Buffer>
+    template <typename Protocols, typename X, typename T, typename Buffer>
     inline void DeserializeElements(
-        nullable<X, Allocator, useValue>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+        nullable<X>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
 
@@ -585,9 +575,9 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename Allocator, bool useValue, typename T, typename Buffer>
+    template <typename Protocols, typename T, typename Buffer>
     inline void DeserializeElements(
-        nullable<blob::value_type, Allocator, useValue>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+        nullable<blob::value_type>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
 
