@@ -10,8 +10,11 @@
 
 #include <bond/protocol/protobuf_binary_reader.h>
 
+#include <boost/range/irange.hpp>
 #include <boost/test/debug.hpp>
 #include <boost/test/unit_test.hpp>
+
+#include <set>
 
 
 namespace bond
@@ -121,7 +124,7 @@ namespace detail
 BOOST_AUTO_TEST_SUITE(ProtobufReaderTests)
 
 template <typename Proto, typename Bond>
-void CheckBinaryFormat(std::initializer_list<Bond> bond_structs)
+void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = true)
 {
     google::protobuf::string str;
     Bond bond_struct;
@@ -135,7 +138,7 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs)
     }
 
     bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
-    bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+    bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
 
     // Compile-time schema
     BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
@@ -144,52 +147,75 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs)
 }
 
 template <typename Proto, typename Bond>
-void CheckBinaryFormat()
+void CheckBinaryFormat(bool strict = true)
 {
-    CheckBinaryFormat<Proto>({ Bond{} });
-    CheckBinaryFormat<Proto>({ InitRandom<Bond>() });
-    CheckBinaryFormat<Proto>({ InitRandom<Bond>(), InitRandom<Bond>(), InitRandom<Bond>() });
+    CheckBinaryFormat<Proto>({ Bond{} }, strict);
+    CheckBinaryFormat<Proto>({ InitRandom<Bond>() }, strict);
+    CheckBinaryFormat<Proto>({ InitRandom<Bond>(), InitRandom<Bond>(), InitRandom<Bond>() }, strict);
 }
 
-//template <typename T>
-//class ToNoUnknowns : public bond::To<T>
-//{
-//public:
-//    ToNoUnknowns(T& var)
-//        : bond::To<T>(var)
-//    {}
-//
-//    template <typename X>
-//    void UnknownField(uint16_t /*id*/, const X& /*value*/) const
-//    {
-//        BOND_THROW(bond::CoreException, "Unknown field");
-//    }
-//};
+class SaveUnknownFields : public bond::DeserializingTransform
+{
+public:
+    explicit SaveUnknownFields(boost::shared_ptr<std::set<uint16_t> > ids)
+        : _ids{ ids }
+    {}
 
-//template <typename Bond>
-//void CheckUnsupportedType()
-//{
-//    auto bond_struct = InitRandom<Bond>();
-//
-//    if (bond_struct != Bond{})
-//    {
-//        Proto proto_struct;
-//        bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
-//
-//        auto str = proto_struct.SerializeAsString();
-//
-//        bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
-//        bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
-//
-//        Bond obj;
-//        BOOST_CHECK_THROW(
-//            bond::Apply(
-//                ToNoUnknowns<Bond>(obj),
-//                bond::bonded<void, bond::ProtobufBinaryReader<bond::InputBuffer>&>(
-//                    reader, bond::GetRuntimeSchema<Bond>())),
-//            bond::CoreException);
-//    }
-//}
+    void Begin(const bond::Metadata& /*metadata*/) const
+    {
+        _ids->clear();
+    }
+
+    void End() const
+    {}
+
+    template <typename T>
+    bool Field(uint16_t /*id*/, const bond::Metadata& /*metadata*/, const T& /*value*/) const
+    {
+        return false;
+    }
+
+    template <typename T>
+    void UnknownField(uint16_t id, const T& /*value*/) const
+    {
+        _ids->insert(id);
+    }
+
+private:
+    boost::shared_ptr<std::set<uint16_t> > _ids;
+};
+
+template <typename Proto, typename Bond, typename Ids>
+void CheckUnknownFields(Ids&& expected_ids)
+{
+    auto bond_struct = InitRandom<Bond>();
+
+    Proto proto_struct;
+    bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
+
+    auto str = proto_struct.SerializeAsString();
+    bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
+
+    auto ids = boost::make_shared<std::set<uint16_t> >();
+
+    // Compile-time schema
+    {
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input };
+        bond::Apply(
+            SaveUnknownFields{ ids },
+            bond::bonded<Bond, decltype(reader)&>{ reader });
+        BOOST_CHECK_EQUAL_COLLECTIONS(std::begin(expected_ids), std::end(expected_ids), ids->begin(), ids->end());
+    }
+
+    // Runtime schema
+    {
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input };
+        bond::Apply(
+            SaveUnknownFields{ ids },
+            bond::bonded<void, decltype(reader)&>{ reader, bond::GetRuntimeSchema<Bond>() });
+        BOOST_CHECK_EQUAL_COLLECTIONS(std::begin(expected_ids), std::end(expected_ids), ids->begin(), ids->end());
+    }
+}
 
 template <typename Bond>
 void DeserializeCheckThrow(const bond::ProtobufBinaryReader<bond::InputBuffer>& reader, std::true_type)
@@ -308,6 +334,13 @@ BOOST_AUTO_TEST_CASE(IntegerContainerTests)
 {
     CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::IntegersContainer>();
     CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::UnpackedIntegersContainer>();
+
+    CheckBinaryFormat<unittest::proto::IntegersContainer, unittest::UnpackedIntegersContainer>(false);
+    CheckBinaryFormat<unittest::proto::UnpackedIntegersContainer, unittest::IntegersContainer>(false);
+
+    auto expected_ids = boost::irange<uint16_t>(1, 1 + boost::mpl::size<unittest::IntegersContainer::Schema::fields>::value);
+    CheckUnknownFields<unittest::proto::IntegersContainer, unittest::UnpackedIntegersContainer>(expected_ids);
+    CheckUnknownFields<unittest::proto::UnpackedIntegersContainer, unittest::IntegersContainer>(expected_ids);
 
     CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint8_t> >, google::protobuf::UInt32Value>();
     CheckUnsupportedValueType<unittest::BoxWrongEncoding<vector<uint16_t> >, google::protobuf::UInt32Value>();

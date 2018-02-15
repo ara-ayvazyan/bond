@@ -117,13 +117,20 @@ namespace bond
         template <BondDataType T>
         inline bool MatchWireType(WireType type, Encoding encoding, Packing packing, bool strict)
         {
-            switch (packing)
+            if (strict)
             {
-            case Packing::False:
-                return MatchWireType<T>(type, encoding, strict);
+                switch (packing)
+                {
+                case Packing::False:
+                    return MatchWireType<T>(type, encoding, true);
 
-            default:
-                return type == WireType::LengthDelimited;
+                default:
+                    return type == WireType::LengthDelimited;
+                }
+            }
+            else
+            {
+                return (type == WireType::LengthDelimited) || MatchWireType<T>(type, encoding, false);
             }
         }
 
@@ -192,13 +199,20 @@ namespace bond
 
         inline bool MatchWireType(BondDataType bond_type, WireType type, Encoding encoding, Packing packing, bool strict)
         {
-            switch (packing)
+            if (strict)
             {
-            case Packing::False:
-                return MatchWireType(bond_type, type, encoding, strict);
+                switch (packing)
+                {
+                case Packing::False:
+                    return MatchWireType(bond_type, type, encoding, true);
 
-            default:
-                return type == WireType::LengthDelimited;
+                default:
+                    return type == WireType::LengthDelimited;
+                }
+            }
+            else
+            {
+                return (type == WireType::LengthDelimited) || MatchWireType(bond_type, type, encoding, false);
             }
         }
 
