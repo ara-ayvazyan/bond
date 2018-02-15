@@ -428,12 +428,12 @@ using IntegerSetContainerWrongEncodingTests_Types = expand<integer_types, int8_t
 BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerSetContainerWrongEncodingTests, T,
     IntegerSetContainerWrongEncodingTests_Types)
 {
-    CheckUnsupportedValueType<unittest::BoxWrongEncoding<set<T> >, proto_box<T> >();
+    CheckUnsupportedValueType<unittest::BoxWrongEncoding<std::set<T> >, proto_box<T> >();
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerSetContainerUnsignedZigZagTests, T, unsigned_integer_types)
 {
-    CheckUnsupportedValueType<unittest::BoxZigZag<set<T> >, proto_box<T> >();
+    CheckUnsupportedValueType<unittest::BoxZigZag<std::set<T> >, proto_box<T> >();
 }
 
 using IntegerSetContainerWrongPackingTests_Types =
@@ -441,7 +441,7 @@ using IntegerSetContainerWrongPackingTests_Types =
 BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerSetContainerWrongPackingTests, T,
     IntegerSetContainerWrongPackingTests_Types)
 {
-    CheckUnsupportedValueType<unittest::BoxWrongPacking<set<T> >, proto_box<T> >();
+    CheckUnsupportedValueType<unittest::BoxWrongPacking<std::set<T> >, proto_box<T> >();
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringContainerTests, T, string_types)
