@@ -38,6 +38,7 @@ namespace bond
 
                 case Encoding::ZigZag:
                     BOOST_ASSERT(T == BT_INT8 || T == BT_INT16);
+                    // fall-through
                 default:
                     return type == WireType::VarInt;
                 }
@@ -61,6 +62,7 @@ namespace bond
 
                 case Encoding::ZigZag:
                     BOOST_ASSERT(T == BT_INT32 || T == BT_INT64);
+                    // fall-through
                 default:
                     return type == WireType::VarInt;
                 }

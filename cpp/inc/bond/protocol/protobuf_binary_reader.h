@@ -11,7 +11,6 @@
 #include "detail/simple_array.h"
 
 #include <boost/locale.hpp>
-#include <boost/shared_ptr.hpp>
 
 /*
     Implements Protocol Buffers binary encoding.
@@ -45,35 +44,33 @@ namespace bond
               _encoding{ detail::proto::Unavailable<Encoding>::value },
               _key_encoding{ detail::proto::Unavailable<Encoding>::value },
               _size{ 0 },
-              _lengths{ boost::make_shared<detail::SimpleArray<uint32_t> >() }
+              _lengths{}
         {}
 
         void ReadStructBegin(bool base = false)
         {
             BOOST_VERIFY(!base);
-            BOOST_ASSERT(_lengths);
 
-            if (_lengths->empty())
+            if (_lengths.empty())
             {
-                _lengths = boost::make_shared<detail::SimpleArray<uint32_t> >();
-                _lengths->push((std::numeric_limits<uint32_t>::max)());
+                _lengths.push((std::numeric_limits<uint32_t>::max)());
             }
             else
             {
                 BOOST_ASSERT(_type == WireType::LengthDelimited);
 
                 Consume(_size);
-                _lengths->push(_size);
+                _lengths.push(_size);
             }
         }
 
         void ReadStructEnd(bool base = false)
         {
             BOOST_VERIFY(!base);
-            BOOST_ASSERT(_lengths && !_lengths->empty());
+            BOOST_ASSERT(!_lengths.empty());
 
-            uint32_t length = _lengths->pop(std::nothrow);
-            BOOST_VERIFY(_lengths->empty() || length == 0);
+            uint32_t length = _lengths.pop(std::nothrow);
+            BOOST_VERIFY(_lengths.empty() || length == 0);
         }
 
         bool ReadFieldBegin(WireType& type, uint16_t& id)
@@ -174,9 +171,10 @@ namespace bond
         Read(T& value)
         {
             BOOST_STATIC_ASSERT(sizeof(value) == sizeof(int32_t));
-            int32_t raw;
-            Read(raw);
-            value = static_cast<T>(raw);
+
+            int32_t value32;
+            Read(value32);
+            value = static_cast<T>(value32);
         }
 
         template <typename T>
@@ -276,8 +274,8 @@ namespace bond
 
         void Consume(uint32_t size)
         {
-            BOOST_ASSERT(_lengths && !_lengths->empty());
-            uint32_t& length = _lengths->top(std::nothrow);
+            BOOST_ASSERT(!_lengths.empty());
+            uint32_t& length = _lengths.top(std::nothrow);
 
             if (length >= size)
             {
@@ -394,8 +392,8 @@ namespace bond
 
         bool ReadTag()
         {
-            BOOST_ASSERT(_lengths && !_lengths->empty());
-            if ((_lengths->top(std::nothrow) != 0) && !_input.IsEof())
+            BOOST_ASSERT(!_lengths.empty());
+            if ((_lengths.top(std::nothrow) != 0) && !_input.IsEof())
             {
                 uint64_t tag;
                 ReadVarInt(tag);
@@ -482,7 +480,7 @@ namespace bond
         Encoding _encoding;
         Encoding _key_encoding;
         uint32_t _size;
-        boost::shared_ptr<detail::SimpleArray<uint32_t> > _lengths;
+        detail::SimpleArray<uint32_t> _lengths;
     };
 
 

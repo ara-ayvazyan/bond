@@ -22,7 +22,7 @@ namespace detail
 template <typename T, uint32_t N = 64>
 class SimpleArray
 {
-    BOOST_STATIC_ASSERT(std::is_pod<T>::value);
+    BOOST_STATIC_ASSERT(std::is_trivially_copyable<T>::value);
     BOOST_STATIC_ASSERT(N != 0);
 
 public:
@@ -32,8 +32,13 @@ public:
           _data(_insitu)
     {}
 
-    SimpleArray(const SimpleArray& other) = delete;
-    SimpleArray& operator=(const SimpleArray& other) = delete;
+    SimpleArray(const SimpleArray& other)
+        : _size(other._size),
+          _capacity(other._capacity),
+          _data(other._data == other._insitu ? _insitu : new T [_capacity])
+    {
+        std::memcpy(_data, other._data, _size * sizeof(T));
+    }
 
     ~SimpleArray()
     {
