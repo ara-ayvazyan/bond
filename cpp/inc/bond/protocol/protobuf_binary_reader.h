@@ -38,12 +38,12 @@ namespace bond
 
         explicit ProtobufBinaryReader(const Buffer& input, bool strict_match = true)
             : _input{ input },
-              _strict_match{ strict_match },
-              _type{ detail::proto::Unavailable<WireType>::value },
+              _size{ 0 },
               _id{ 0 },
+              _type{ detail::proto::Unavailable<WireType>::value },
               _encoding{ detail::proto::Unavailable<Encoding>::value },
               _key_encoding{ detail::proto::Unavailable<Encoding>::value },
-              _size{ 0 },
+              _strict_match{ strict_match },
               _lengths{}
         {}
 
@@ -474,12 +474,12 @@ namespace bond
 
 
         Buffer _input;
-        bool _strict_match;
-        WireType _type;
+        uint32_t _size;
         uint16_t _id;
+        WireType _type;
         Encoding _encoding;
         Encoding _key_encoding;
-        uint32_t _size;
+        bool _strict_match;
         detail::SimpleArray<uint32_t> _lengths;
     };
 
