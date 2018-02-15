@@ -468,14 +468,17 @@ namespace bond
                                     || is_set_container<typename T::field_type>::value, bool>::type
         Field(const Transform& transform, WireType type)
         {
+            using is_blob = std::integral_constant<bool,
+                detail::proto::is_blob_type<typename T::field_type>::value
+                || detail::proto::is_nested_blob_type<typename T::field_type>::value>;
+
             bool matched;
 
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4127) // C4127: conditional expression is constant
 #endif
-            if (detail::proto::is_blob_type<typename T::field_type>::value
-                || detail::proto::is_nested_blob_type<typename T::field_type>::value)
+            if (is_blob::value)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -484,15 +487,20 @@ namespace bond
             }
             else
             {
+                using element = typename element_type<typename T::field_type>::type;
+
+                BOOST_STATIC_ASSERT(is_blob::value
+                    || (get_type_id<element>::value != BT_LIST && get_type_id<element>::value != BT_SET && get_type_id<element>::value != BT_MAP));
+
                 Packing packing = _strict_match
-                    ? detail::proto::ReadPacking(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata)
+                    ? detail::proto::ReadPacking(get_type_id<element>::value, &T::metadata)
                     : detail::proto::Unavailable<Packing>::value;
 
-                Encoding encoding = detail::proto::ReadEncoding(get_type_id<typename element_type<typename T::field_type>::type>::value, &T::metadata);
+                Encoding encoding = detail::proto::ReadEncoding(get_type_id<element>::value, &T::metadata);
 
                 _input.SetEncoding(encoding);
 
-                matched = detail::proto::MatchWireType<get_type_id<typename element_type<typename T::field_type>::type>::value>(type, encoding, packing, _strict_match);
+                matched = detail::proto::MatchWireType<get_type_id<element>::value>(type, encoding, packing, _strict_match);
             }
 
             if (matched)
@@ -572,6 +580,11 @@ namespace bond
                         }
                         else
                         {
+                            if (field->type.element->id == BT_LIST || field->type.element->id == BT_SET || field->type.element->id == BT_MAP)
+                            {
+                                detail::proto::NotSupportedException("Container nesting");
+                            }
+
                             Packing packing = _strict_match
                                 ? detail::proto::ReadPacking(field->type.element->id, &field->metadata)
                                 : detail::proto::Unavailable<Packing>::value;

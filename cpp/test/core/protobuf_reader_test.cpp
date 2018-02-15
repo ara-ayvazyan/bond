@@ -258,6 +258,11 @@ void set_value(Proto& value)
     value.set_value(1);
 }
 
+void set_value(google::protobuf::StringValue& value)
+{
+    value.set_value("1");
+}
+
 void set_value(google::protobuf::BytesValue& value)
 {
     value.set_value("1");
@@ -547,38 +552,55 @@ BOOST_AUTO_TEST_CASE(StructMapValueTests)
 
 BOOST_AUTO_TEST_CASE(NestedContainersTests)
 {
-    /*CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint8_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<uint64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<int64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<unittest::Enum> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<bool> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<float> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<double> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<std::string> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<std::wstring> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<bond::blob> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::vector<unittest::Integers> > > >();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<uint8_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<uint16_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<uint32_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<uint64_t> > >, google::protobuf::UInt64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<int16_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<int32_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<int64_t> > >, google::protobuf::Int64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<unittest::Enum> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<bool> > >, google::protobuf::BoolValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<float> > >, google::protobuf::FloatValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<double> > >, google::protobuf::DoubleValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<std::string> > >, google::protobuf::StringValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<std::wstring> > >, google::protobuf::StringValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<bond::blob> > >, google::protobuf::BytesValue, true>();
+    //CheckUnsupportedValueType<unittest::Box<std::vector<std::vector<unittest::Integers> > > >();
 
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint8_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<uint64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<int8_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<int16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<int32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<int64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<unittest::Enum> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<bool> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<float> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<double> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<std::string> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::set<std::wstring> > > >();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<uint8_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<uint16_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<uint32_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<uint64_t> > >, google::protobuf::UInt64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<int8_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<int16_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<int32_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<int64_t> > >, google::protobuf::Int64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<unittest::Enum> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<bool> > >, google::protobuf::BoolValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<float> > >, google::protobuf::FloatValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<double> > >, google::protobuf::DoubleValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<std::string> > >, google::protobuf::StringValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::set<std::wstring> > >, google::protobuf::StringValue, true>();
 
-    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint8_t> > > >();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, uint8_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, uint16_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, uint32_t> > >, google::protobuf::UInt32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, uint64_t> > >, google::protobuf::UInt64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, int8_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, int16_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, int32_t> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, int64_t> > >, google::protobuf::Int64Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, unittest::Enum> > >, google::protobuf::Int32Value, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, bool> > >, google::protobuf::BoolValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, float> > >, google::protobuf::FloatValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, double> > >, google::protobuf::DoubleValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, std::string> > >, google::protobuf::StringValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, std::wstring> > >, google::protobuf::StringValue, true>();
+    CheckUnsupportedValueType<unittest::Box<std::vector<std::map<uint32_t, bond::blob> > >, google::protobuf::BytesValue, true>();
+    //CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, unittest::Integers> > > >();
+
+    /*CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint8_t> > > >();
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint16_t> > > >();
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint32_t> > > >();
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<uint64_t> > > >();
@@ -593,23 +615,38 @@ BOOST_AUTO_TEST_CASE(NestedContainersTests)
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<std::wstring> > > >();
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<bond::blob> > > >();
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<unittest::Integers> > > >();
-
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint8_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, uint64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int8_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int16_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int32_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, int64_t> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, unittest::Enum> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, bool> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, float> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, double> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, std::string> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, std::wstring> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, bond::blob> > > >();
-    CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, unittest::Integers> > > >();*/
+    
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<int8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<float> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<double> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<std::wstring> > > >();
+    
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, uint8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, uint16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, uint32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, uint64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, int8_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, int16_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, int32_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, int64_t> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, unittest::Enum> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, bool> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, float> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, double> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, std::string> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, std::wstring> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, bond::blob> > > >();
+    CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, unittest::Integers> > > >();*/
 }
 
 BOOST_AUTO_TEST_CASE(ComplexStructTests)
