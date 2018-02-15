@@ -16,6 +16,11 @@
 
 namespace bond
 {
+
+template <> struct
+is_protocol_enabled<ProtobufBinaryReader<InputBuffer> >
+    : std::true_type {};
+
 namespace detail
 {
     template <typename T>
@@ -415,10 +420,38 @@ BOOST_AUTO_TEST_CASE(NestedStructTests)
         unittest::proto::NestedStruct,
         unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
 
-    // TODO:
-    /*unittest::BoxWrongPackingWrongEncoding<bond::bonded<unittest::Integers> > box;
-    box.value = bond::bonded<unittest::Integers>{ InitRandom<unittest::Integers>() };
-    CheckBinaryFormat<unittest::proto::NestedStruct>(box);*/
+    // bonded<T>
+    {
+        using Bond = unittest::Integers;
+        using Box = unittest::BoxWrongPackingWrongEncoding<bond::bonded<Bond> >;
+        using Protocols = bond::Protocols<bond::ProtobufBinaryReader<bond::InputBuffer> >;
+
+        auto bond_struct = InitRandom<Bond>();
+
+        Box bond_box;
+        bond_box.value = bond::bonded<Bond>{ boost::ref(bond_struct) };
+
+        unittest::proto::NestedStruct proto_box;
+        bond::Apply(bond::detail::proto::ToProto{ *proto_box.mutable_value() }, bond_struct);
+
+        auto str = proto_box.SerializeAsString();
+
+        bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader(input);
+
+        // Compile-time schema
+        {
+            auto bond_box2 = bond::Deserialize<Box>(reader);
+            auto bond_struct2 = bond_box2.value.Deserialize<Bond, Protocols>();
+            BOOST_CHECK((bond_struct == bond_struct2));
+        }
+        // Runtime schema
+        {
+            auto bond_box2 = bond::Deserialize<Box>(reader, bond::GetRuntimeSchema<Box>());
+            auto bond_struct2 = bond_box2.value.Deserialize<Bond, Protocols>();
+            BOOST_CHECK((bond_struct == bond_struct2));
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE(NullableTests)

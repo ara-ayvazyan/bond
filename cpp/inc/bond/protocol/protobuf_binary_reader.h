@@ -35,7 +35,7 @@ namespace bond
         using Parser = ProtobufParser<ProtobufBinaryReader&>;
         using Writer = ProtobufBinaryWriter<Buffer>;
 
-        friend class Parser;
+        BOND_STATIC_CONSTEXPR uint16_t magic = 0x5042;
 
         explicit ProtobufBinaryReader(const Buffer& input, bool strict_match = true)
             : _input{ input },
@@ -280,6 +280,8 @@ namespace bond
         }
 
     private:
+        friend class Parser;
+
         void Consume(uint32_t size)
         {
             BOOST_ASSERT(_lengths && !_lengths->empty());
@@ -484,7 +486,7 @@ namespace bond
 
 
         Buffer _input;
-        const bool _strict_match;
+        bool _strict_match;
         WireType _type;
         uint16_t _id;
         Encoding _encoding;
