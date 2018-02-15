@@ -519,6 +519,9 @@ namespace bond
         {
             BOOST_STATIC_ASSERT(!std::is_floating_point<typename T::field_type::key_type>::value);
 
+            BOOST_STATIC_ASSERT(detail::proto::is_blob_type<typename T::field_type::mapped_type>::value
+                                || !is_container<typename T::field_type::mapped_type>::value);
+
             if (detail::proto::MatchWireType<BT_MAP>(type))
             {
                 _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(
@@ -606,6 +609,13 @@ namespace bond
                     {
                         if (detail::proto::MatchWireType<BT_MAP>(type))
                         {
+                            if (field->type.element->id == BT_SET
+                                || field->type.element->id == BT_MAP
+                                || (field->type.element->id == BT_LIST && field->type.element->element->id != BT_INT8)) // nested blob
+                            {
+                                detail::proto::NotSupportedException("Container nesting");
+                            }
+
                             BOOST_ASSERT(field->type.key.hasvalue());
                             _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
 
