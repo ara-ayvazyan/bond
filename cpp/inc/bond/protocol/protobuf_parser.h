@@ -98,21 +98,12 @@ namespace bond
         }
 
         template <BondDataType T>
-        typename boost::enable_if_c<(T == BT_LIST), bool>::type
-        inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
+        typename boost::enable_if_c<(T == BT_LIST || T == BT_SET), bool>::type
+        inline MatchWireType(WireType /*type*/, Encoding /*encoding*/, bool /*strict*/)
         {
-            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
-            return type == WireType::VarInt;
+            BOOST_ASSERT(false);
+            return false;
         }
-
-        template <BondDataType T>
-        typename boost::enable_if_c<(T == BT_SET), bool>::type
-        inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
-        {
-            BOOST_VERIFY(encoding == Unavailable<Encoding>::value);
-            return type == WireType::VarInt;
-        }
-
 
         template <BondDataType T>
         inline bool MatchWireType(WireType type, Encoding encoding, Packing packing, bool strict)
@@ -181,15 +172,11 @@ namespace bond
             case BT_STRUCT:
                 return MatchWireType<BT_STRUCT>(type, encoding, strict);
 
-            case BT_LIST:
-                return MatchWireType<BT_LIST>(type, encoding, strict);
-
-            case BT_SET:
-                return MatchWireType<BT_SET>(type, encoding, strict);
-
             case BT_MAP:
                 return MatchWireType<BT_MAP>(type, encoding, strict);
 
+            case BT_LIST:
+            case BT_SET:
             default:
                 BOOST_ASSERT(false);
                 return false;
