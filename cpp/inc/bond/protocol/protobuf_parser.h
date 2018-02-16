@@ -470,7 +470,7 @@ namespace bond
 #pragma warning(pop)
 #endif
             {
-                matched = true;
+                matched = (type == WireType::LengthDelimited);
             }
             else
             {
@@ -566,7 +566,7 @@ namespace bond
                         if ((field->type.id == BT_LIST && field->type.element->id == BT_INT8)                       // blob
                             || (field->type.element->id == BT_LIST && field->type.element->element->id == BT_INT8)) // nested blobs
                         {
-                            matched = true;
+                            matched = (type == WireType::LengthDelimited);
                         }
                         else
                         {

@@ -43,6 +43,27 @@ struct BoxUnpacked<T>
     1: T value;
 }
 
+struct BoxUnpackedFixed<T>
+{
+    [ProtoPack("False")]
+    [ProtoEncode("Fixed")]
+    1: T value;
+}
+
+struct BoxUnpackedZigZag<T>
+{
+    [ProtoPack("False")]
+    [ProtoEncode("ZigZag")]
+    1: T value;
+}
+
+struct BoxUnpackedWrongEncoding<T>
+{
+    [ProtoPack("False")]
+    [ProtoEncodeValue("WrongValue")]
+    1: T value;
+}
+
 struct BoxWrongPacking<T>
 {
     [ProtoPack("WrongValue")]
