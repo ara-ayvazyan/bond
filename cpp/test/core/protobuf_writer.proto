@@ -97,12 +97,12 @@ message BlobContainer
 
 message StructContainer
 {
-    repeated Integers value = 1;
+    repeated IntegersContainer value = 1;
 }
 
 message NestedStruct
 {
-    Integers value = 1;
+    IntegersContainer value = 1;
 }
 
 message Nullable
@@ -110,11 +110,11 @@ message Nullable
     uint32 ui32 = 1;
     string str = 2;
     bytes b = 3;
-    Integers s = 4;
+    IntegersContainer s = 4;
     repeated uint32 vui32 = 5;
     repeated string vstr = 6;
     repeated bytes vb = 7;
-    repeated Integers vs = 8;
+    repeated IntegersContainer vs = 8;
 }
 
 message IntegerMapKeys
@@ -186,7 +186,7 @@ message BlobMapValue
 }
 message StructMapValue
 {
-    map<uint32, Integers> value = 1;
+    map<uint32, IntegersContainer> value = 1;
 }
 
 message ComplexItem

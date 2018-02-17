@@ -455,7 +455,7 @@ struct Nullable
 
     3: nullable<blob> b;
 
-    4: nullable<Integers> s;
+    4: nullable<IntegersContainer> s;
 
     5: nullable<uint32> vui32;
 
@@ -463,7 +463,7 @@ struct Nullable
 
     7: nullable<blob> vb;
 
-    8: nullable<Integers> vs;
+    8: nullable<IntegersContainer> vs;
 }
 
 struct IntegerMapKeys

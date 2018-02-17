@@ -234,17 +234,17 @@ BOOST_AUTO_TEST_CASE(StructContainerTests)
 {
     CheckBinaryFormat<
         unittest::proto::StructContainer,
-        unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::Integers> > >();
+        unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::IntegersContainer> > >();
 }
 
 BOOST_AUTO_TEST_CASE(NestedStructTests)
 {
     CheckBinaryFormat<
         unittest::proto::NestedStruct,
-        unittest::BoxWrongPackingWrongEncoding<unittest::Integers> >();
+        unittest::BoxWrongPackingWrongEncoding<unittest::IntegersContainer> >();
 
-    unittest::BoxWrongPackingWrongEncoding<bond::bonded<unittest::Integers> > box;
-    box.value = bond::bonded<unittest::Integers>{ InitRandom<unittest::Integers>() };
+    unittest::BoxWrongPackingWrongEncoding<bond::bonded<unittest::IntegersContainer> > box;
+    box.value = bond::bonded<unittest::IntegersContainer>{ InitRandom<unittest::IntegersContainer>() };
     CheckBinaryFormat<unittest::proto::NestedStruct>(box);
 }
 
@@ -291,10 +291,10 @@ BOOST_AUTO_TEST_CASE(StructMapValueTests)
 {
     CheckBinaryFormat<
         unittest::proto::StructMapValue,
-        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::Integers> > >();
+        unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::IntegersContainer> > >();
 }
 
-using NestedVectorVectorTests_Types = expand<basic_types, bond::blob, unittest::Integers>;
+using NestedVectorVectorTests_Types = expand<basic_types, bond::blob, unittest::IntegersContainer>;
 BOOST_AUTO_TEST_CASE_TEMPLATE(NestedVectorVectorTests, T, NestedVectorVectorTests_Types)
 {
     CheckUnsupportedType<unittest::Box<std::vector<std::vector<T> > > >();
@@ -306,13 +306,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(NestedVectorSetTests, T, NestedVectorSetTests_Type
     CheckUnsupportedType<unittest::Box<std::vector<std::set<T> > > >();
 }
 
-using NestedVectorMapTests_Types = expand<basic_types, int8_t, bond::blob, unittest::Integers>;
+using NestedVectorMapTests_Types = expand<basic_types, int8_t, bond::blob, unittest::IntegersContainer>;
 BOOST_AUTO_TEST_CASE_TEMPLATE(NestedVectorMapTests, T, NestedVectorMapTests_Types)
 {
     CheckUnsupportedType<unittest::Box<std::vector<std::map<uint32_t, T> > > >();
 }
 
-using NestedMapVectorTests_Types = expand<basic_types, bond::blob, unittest::Integers>;
+using NestedMapVectorTests_Types = expand<basic_types, bond::blob, unittest::IntegersContainer>;
 BOOST_AUTO_TEST_CASE_TEMPLATE(NestedMapVectorTests, T, NestedMapVectorTests_Types)
 {
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::vector<T> > > >();
@@ -324,7 +324,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(NestedMapSetTests, T, NestedMapSetTests_Types)
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::set<T> > > >();
 }
 
-using NestedMapMapTests_Types = expand<basic_types, int8_t, bond::blob, unittest::Integers>;
+using NestedMapMapTests_Types = expand<basic_types, int8_t, bond::blob, unittest::IntegersContainer>;
 BOOST_AUTO_TEST_CASE_TEMPLATE(NestedMapMapTests, T, NestedMapMapTests_Types)
 {
     CheckUnsupportedType<unittest::Box<std::map<uint32_t, std::map<uint32_t, T> > > >();
