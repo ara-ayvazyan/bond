@@ -76,8 +76,13 @@ template <typename Proto, typename Bond>
 void CheckBinaryFormat(bool strict = true)
 {
     CheckBinaryFormat<Proto>({ Bond{} }, strict);
-    CheckBinaryFormat<Proto>({ InitRandom<Bond>() }, strict);
-    CheckBinaryFormat<Proto>({ InitRandom<Bond>(), InitRandom<Bond>(), InitRandom<Bond>() }, strict);
+
+    auto s1 = InitRandom<Bond>();
+    CheckBinaryFormat<Proto>({ s1 }, strict);
+
+    auto s2 = InitRandom<Bond>();
+    auto s3 = InitRandom<Bond>();
+    CheckBinaryFormat<Proto>({ s1, s2, s3, s2, s1, s3 }, strict);
 }
 
 class SaveUnknownFields : public bond::DeserializingTransform

@@ -81,7 +81,7 @@ namespace proto
             for (const_enumerator<X> items(var); items.more(); )
             {
                 const auto& item = items.next();
-                Append(item.second, mapped_at(value, item.first));
+                mapped_at(value, item.first) = item.second;
             }
         }
 

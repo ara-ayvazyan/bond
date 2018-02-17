@@ -492,6 +492,14 @@ namespace bond
             return ApplyTransform<Protocols>(bond::To<T, Protocols, UnorderedRequiredFieldValiadator<T> >{ transform }, bonded);
         }
 
+        template <typename Protocols, typename T, typename X, typename Buffer>
+        bool ApplyTransform(const bond::To<T, bond::Protocols<ProtobufBinaryReader<Buffer> > >& transform, const bonded<X>& bonded)
+        {
+            BOOST_STATIC_ASSERT(std::is_same<Protocols, bond::Protocols<ProtobufBinaryReader<Buffer> > >::value);
+
+            return ApplyTransform<Protocols>(bond::To<T, Protocols, UnorderedRequiredFieldValiadator<T> >{ transform }, bonded);
+        }
+
     } // namesace detail
 
 
