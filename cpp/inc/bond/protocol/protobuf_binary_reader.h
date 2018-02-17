@@ -90,9 +90,19 @@ namespace bond
             _encoding = encoding;
         }
 
+        Encoding GetEncoding() const
+        {
+            return _encoding;
+        }
+
         void SetKeyEncoding(Encoding encoding)
         {
             _key_encoding = encoding;
+        }
+
+        Encoding GetKeyEncoding() const
+        {
+            return _key_encoding;
         }
 
         const uint32_t& GetSize() const
@@ -270,7 +280,7 @@ namespace bond
         }
 
     private:
-        friend class Parser;
+        friend Parser;
 
         void Consume(uint32_t size)
         {
@@ -466,13 +476,6 @@ namespace bond
         }
 
 
-        template <typename Protocols, typename Key, typename Value>
-        friend inline void DeserializeKeyValuePair(Key& key, Value& value, ProtobufBinaryReader<Buffer>& input)
-        {
-            detail::proto::DeserializeKeyValuePair<Protocols>(key, input._key_encoding, value, input._encoding, input);
-        }
-
-
         Buffer _input;
         uint32_t _size;
         uint16_t _id;
@@ -644,10 +647,14 @@ namespace bond
         uint32_t size)
     {
         BOOST_VERIFY(size == 0);
+        
         typename element_type<X>::type::first_type k = make_key(var);
         typename element_type<X>::type::second_type v = make_value(var);
 
-        DeserializeKeyValuePair<Protocols>(k, v, element.GetInput());
+        auto&& input = element.GetInput();
+
+        detail::proto::DeserializeKeyValuePair<Protocols>(
+            k, input.GetKeyEncoding(), v, input.GetEncoding(), input);
         mapped_at(var, k) = std::move(v);
     }
 

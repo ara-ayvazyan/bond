@@ -17,6 +17,7 @@
 #include <boost/test/debug.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include <initializer_list>
 #include <set>
 
 
@@ -284,7 +285,7 @@ void CheckWireTypeMatch(bond::detail::proto::WireType type, WireTypeMatchFlag ma
     BOOST_STATIC_ASSERT(boost::mpl::size<typename bond::schema<T>::type::fields>::value == 1);
 
     std::initializer_list<uint16_t> match{};
-    std::initializer_list<uint16_t> no_match{ typename bond::schema<T>::type::var::value::id };
+    std::initializer_list<uint16_t> no_match{ bond::schema<T>::type::var::value::id };
 
     google::protobuf::UInt32Value varint_value;
     SetValue(varint_value);
