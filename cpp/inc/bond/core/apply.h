@@ -83,13 +83,15 @@ ApplyTransform(const Transform& transform, const T& value)
 template <typename Protocols, typename Transform, typename T, typename boost::enable_if<is_modifying_transform<Transform> >::type*>
 bool Apply(const Transform& transform, T& value)
 {
-    return detail::ApplyTransform<Protocols>(transform, value);
+    using detail::ApplyTransform;
+    return ApplyTransform<Protocols>(transform, value);
 }
 
 template <typename Protocols, typename Transform, typename T>
 bool Apply(const Transform& transform, const T& value)
 {
-    return detail::ApplyTransform<Protocols>(transform, value);
+    using detail::ApplyTransform;
+    return ApplyTransform<Protocols>(transform, value);
 }
 
 } // namespace bond
