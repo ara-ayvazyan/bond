@@ -1,6 +1,7 @@
 #include "precompiled.h"
 #include "unit_test_util.h"
 #include "to_proto.h"
+#include "append_to.h"
 
 #include "protobuf_writer_apply.h"
 #include "protobuf_writer_reflection.h"
@@ -21,105 +22,10 @@
 
 namespace bond
 {
+    template <> struct
+    is_protocol_enabled<ProtobufBinaryReader<InputBuffer> >
+        : std::true_type {};
 
-template <> struct
-is_protocol_enabled<ProtobufBinaryReader<InputBuffer> >
-    : std::true_type {};
-
-namespace detail
-{
-    template <typename T>
-    class AppendTo : public ModifyingTransform
-    {
-    public:
-        using FastPathType = T;
-
-        explicit AppendTo(const T& var)
-            : _var{ var }
-        {}
-
-        void Begin(const Metadata&) const
-        {}
-
-        void End() const
-        {}
-
-        void UnknownEnd() const
-        {}
-
-        template <typename X>
-        bool Base(const X& /*value*/) const
-        {
-            BOOST_ASSERT(false);
-        }
-
-        template <typename FieldT, typename X>
-        bool Field(const FieldT&, X& value) const
-        {
-            auto&& var = FieldT::GetVariable(_var);
-
-            if (!detail::is_default(var, FieldT::metadata))
-            {
-                Append(var, value);
-            }
-
-            return false;
-        }
-
-    private:
-        template <typename X>
-        typename boost::enable_if<is_basic_type<X> >::type
-        Append(const X& var, X& value) const
-        {
-            value = var;
-        }
-
-        template <typename X>
-        typename boost::enable_if<has_schema<X> >::type
-        Append(const X& var, X& value) const
-        {
-            bond::Apply(AppendTo<X>{ var }, value);
-        }
-
-        template <typename X>
-        typename boost::enable_if_c<is_list_container<X>::value || is_set_container<X>::value>::type
-        Append(const X& var, X& value) const
-        {
-            for (const_enumerator<X> items(var); items.more(); )
-            {
-                container_append(value, items.next());
-            }
-        }
-
-        template <typename X>
-        typename boost::enable_if<is_map_container<X> >::type
-        Append(const X& var, X& value) const
-        {
-            for (const_enumerator<X> items(var); items.more(); )
-            {
-                const auto& item = items.next();
-                Append(item.second, mapped_at(value, item.first));
-            }
-        }
-
-        void Append(const blob& var, blob& value) const
-        {
-            value = merge(value, var);
-        }
-
-        template <typename X>
-        void Append(const nullable<X>& var, nullable<X>& value) const
-        {
-            if (var.hasvalue())
-            {
-                Append(var.value(), value.set());
-            }
-        }
-
-        const T& _var;
-    };
-
-} // namespace detail
 } // namespace bond
 
 
@@ -128,24 +34,42 @@ BOOST_AUTO_TEST_SUITE(ProtobufReaderTests)
 template <typename Proto, typename Bond>
 void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = true)
 {
-    google::protobuf::string str;
+    Proto proto_struct;
     Bond bond_struct;
+    google::protobuf::string merged_payload;
 
     for (const Bond& b : bond_structs)
     {
         Proto p;
         bond::Apply(bond::detail::proto::ToProto{ p }, b);
-        str += p.SerializeAsString();
-        bond::Apply(bond::detail::AppendTo<Bond>{ b }, bond_struct);
+        proto_struct.MergeFrom(p);
+        merged_payload += p.SerializeAsString();
+        bond::Apply(bond::detail::proto::AppendTo<Bond>{ b }, bond_struct);
     }
 
-    bond::InputBuffer input(str.data(), static_cast<uint32_t>(str.length()));
-    bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
+    auto payload = proto_struct.SerializeAsString();
 
-    // Compile-time schema
-    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
-    // Runtime schema
-    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
+    // merged payload
+    {
+        bond::InputBuffer input(merged_payload.data(), static_cast<uint32_t>(merged_payload.length()));
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
+
+        // Compile-time schema
+        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
+        // Runtime schema
+        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
+    }
+    // merged object
+    {
+        
+        bond::InputBuffer input(payload.data(), static_cast<uint32_t>(payload.length()));
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
+
+        // Compile-time schema
+        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
+        // Runtime schema
+        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
+    }
 }
 
 template <typename Proto, typename Bond>
@@ -627,7 +551,6 @@ BOOST_AUTO_TEST_CASE(BoolUnpackedSetContainerWireTypeMatchTests)
     CheckWireTypeMatch<unittest::BoxUnpackedWrongEncoding<std::set<bool> > >(
         WireTypeMatchMask::LengthDelimited | WireTypeMatchMask::VarInt);
 }
-
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerSetContainerWireTypeMatchTests, T, unsigned_integer_types)
 {

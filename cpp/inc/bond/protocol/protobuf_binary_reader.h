@@ -549,6 +549,8 @@ namespace bond
     {
         BOOST_VERIFY(size == 0);
 
+        resize_list(var, 0);
+
         while (element.GetInput().GetSize() != 0)
         {
             blob::value_type byte;
@@ -564,12 +566,11 @@ namespace bond
     {
         BOOST_VERIFY(size == 0);
 
-        element.template Deserialize<Protocols>(var.set());
-
-        if (element.GetInput().GetSize() != 0)
+        do
         {
-            element.Skip();
+            element.template Deserialize<Protocols>(var.set());
         }
+        while (element.GetInput().GetSize() != 0);
     }
 
 
@@ -579,14 +580,9 @@ namespace bond
     {
         BOOST_VERIFY(size == 0);
 
-        if (element.GetInput().GetSize() != 0)
+        while (element.GetInput().GetSize() != 0)
         {
             element.GetInput().ReadByte(var.set());
-        }
-
-        if (element.GetInput().GetSize() != 0)
-        {
-            element.Skip();
         }
     }
 
@@ -628,9 +624,7 @@ namespace bond
     template <typename Protocols, typename T, typename Buffer>
     inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
     {
-        blob value;
-        input.Read(value);
-        var = merge(var, value);
+        input.Read(var);
     }
 
 

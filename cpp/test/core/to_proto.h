@@ -2,6 +2,7 @@
 
 #include <bond/core/bond.h>
 #include <bond/core/tuple.h>
+#include <bond/protocol/detail/protobuf_utils.h>
 
 #include <google/protobuf/message.h>
 
@@ -12,19 +13,6 @@ namespace detail
 {
 namespace proto
 {
-    template <typename T, typename Enable = void> struct
-    is_blob_container
-        : std::false_type {};
-
-    template <typename T> struct
-    is_blob_container<T, typename boost::enable_if<is_list_container<T> >::type>
-        : std::is_same<typename element_type<T>::type, blob::value_type> {};
-
-    template <typename T> struct
-    is_blob
-        : std::integral_constant<bool, is_blob_container<T>::value || std::is_same<T, blob>::value> {};
-
-
     class ToProto : public SerializingTransform
     {
     public:
@@ -51,7 +39,7 @@ namespace proto
         }
 
         template <typename T>
-        typename boost::disable_if_c<is_container<T>::value && !is_blob<T>::value, bool>::type
+        typename boost::disable_if_c<is_container<T>::value && !is_blob_type<T>::value, bool>::type
         Field(uint16_t id, const Metadata& /*metadata*/, const T& value) const
         {
             SetValue(GetField(id), value);
@@ -59,7 +47,7 @@ namespace proto
         }
 
         template <typename T>
-        typename boost::enable_if_c<is_container<T>::value && !is_blob_container<T>::value, bool>::type
+        typename boost::enable_if_c<is_container<T>::value && !is_blob_type<T>::value, bool>::type
         Field(uint16_t id, const Metadata& /*metadata*/, const T& value) const
         {
             const auto& field = GetField(id);
@@ -289,14 +277,14 @@ namespace proto
         }
 
         template <typename T>
-        typename boost::enable_if<is_blob<T> >::type
+        typename boost::enable_if<is_blob_type<T> >::type
         SetValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             SetValue(field, ToString(value));
         }
 
         template <typename T>
-        typename boost::enable_if<is_blob<T> >::type
+        typename boost::enable_if<is_blob_type<T> >::type
         AddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
         {
             AddValue(field, ToString(value));

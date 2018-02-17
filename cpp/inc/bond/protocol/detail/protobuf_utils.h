@@ -252,6 +252,15 @@ namespace proto
         }
     }
 
+    template <typename T, typename Enable = void> struct
+    is_blob_type
+        : std::false_type {};
+
+    template <typename T> struct
+    is_blob_type<T, typename boost::enable_if<is_list_container<T> >::type>
+        : std::integral_constant<bool,
+            (get_type_id<typename element_type<T>::type>::value == BT_INT8)> {};
+
 } // namespace proto
 } // namespace detail
 } // namespace bond
