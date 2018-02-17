@@ -14,7 +14,7 @@ namespace proto
     class AppendTo : public ModifyingTransform
     {
     public:
-        using FastPathType = T;
+        using UseFastObjectPath = std::true_type;
 
         explicit AppendTo(const T& var)
             : _var{ var }

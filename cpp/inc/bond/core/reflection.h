@@ -439,6 +439,16 @@ is_fast_path_field<Field, Transform, typename boost::enable_if<std::is_same<type
      : std::true_type {};
 
 
+template <typename Transform, typename Enable = void> struct
+is_fast_object_path_field
+    : std::false_type {};
+
+
+template <typename Transform> struct
+is_fast_object_path_field<Transform, typename boost::enable_if<std::is_class<typename Transform::UseFastObjectPath> >::type>
+     : std::integral_constant<bool, Transform::UseFastObjectPath::value> {};
+
+
 template <typename T> struct
 is_nested_field
     : is_bond_type<typename T::field_type> {};

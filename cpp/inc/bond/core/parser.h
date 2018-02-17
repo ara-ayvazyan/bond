@@ -192,7 +192,7 @@ private:
 
     template <typename T, typename Transform>
     typename boost::enable_if_c<!is_reader<Input, T>::value
-                            && !is_fast_path_field<T, Transform>::value, bool>::type
+                            && !is_fast_object_path_field<Transform>::value, bool>::type
     NextField(const T&, const Transform& transform)
     {
         return transform.Field(T::id, T::metadata, T::GetVariable(_input));
@@ -201,7 +201,7 @@ private:
 
     template <typename T, typename Transform>
     typename boost::enable_if_c<!is_reader<Input, T>::value
-                            && is_fast_path_field<T, Transform>::value, bool>::type
+                            && is_fast_object_path_field<Transform>::value, bool>::type
     NextField(const T& field, const Transform& transform)
     {
         return transform.Field(field, T::GetVariable(_input));
