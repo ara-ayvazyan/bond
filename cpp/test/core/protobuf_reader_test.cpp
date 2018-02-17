@@ -85,10 +85,10 @@ void CheckBinaryFormat(bool strict = true)
     CheckBinaryFormat<Proto>({ s1, s2, s3, s2, s1, s3 }, strict);
 }
 
-class SaveUnknownFields : public bond::DeserializingTransform
+class CollectUnknownFields : public bond::DeserializingTransform
 {
 public:
-    explicit SaveUnknownFields(boost::shared_ptr<std::set<uint16_t> > ids)
+    explicit CollectUnknownFields(boost::shared_ptr<std::set<uint16_t> > ids)
         : _ids{ ids }
     {}
 
@@ -128,17 +128,16 @@ void CheckUnknownFields(const Proto& proto_struct, Ids expected_ids, bool strict
     {
         bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
         bond::Apply(
-            SaveUnknownFields{ ids },
+            CollectUnknownFields{ ids },
             bond::bonded<Bond, decltype(reader)&>{ reader });
         BOOST_CHECK_EQUAL_COLLECTIONS(
             std::begin(expected_ids), std::end(expected_ids), ids->begin(), ids->end());
     }
-
     // Runtime schema
     {
         bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
         bond::Apply(
-            SaveUnknownFields{ ids },
+            CollectUnknownFields{ ids },
             bond::bonded<void, decltype(reader)&>{ reader, bond::GetRuntimeSchema<Bond>() });
         BOOST_CHECK_EQUAL_COLLECTIONS(
             std::begin(expected_ids), std::end(expected_ids), ids->begin(), ids->end());
@@ -257,7 +256,7 @@ using proto_box_mapping = boost::mpl::map<
 template <typename T>
 using proto_box = typename boost::mpl::at<proto_box_mapping, T>::type;
 
-enum class WireTypeMatchMask : uint8_t
+enum class WireTypeMatchFlag : uint8_t
 {
     None = 0,
     VarInt = 0x1,
@@ -267,25 +266,25 @@ enum class WireTypeMatchMask : uint8_t
     All = 0xF
 };
 
-WireTypeMatchMask operator|(WireTypeMatchMask left, WireTypeMatchMask right)
+WireTypeMatchFlag operator|(WireTypeMatchFlag left, WireTypeMatchFlag right)
 {
-    return static_cast<WireTypeMatchMask>(uint8_t(left) | uint8_t(right));
+    return static_cast<WireTypeMatchFlag>(uint8_t(left) | uint8_t(right));
 }
 
-bool operator&(WireTypeMatchMask left, WireTypeMatchMask right)
+bool operator&(WireTypeMatchFlag left, WireTypeMatchFlag right)
 {
-    return static_cast<WireTypeMatchMask>(uint8_t(left) & uint8_t(right)) != WireTypeMatchMask::None;
+    return static_cast<WireTypeMatchFlag>(uint8_t(left) & uint8_t(right)) != WireTypeMatchFlag::None;
 }
 
 template <typename T>
-void CheckWireTypeMatch(bond::detail::proto::WireType type, WireTypeMatchMask mask)
+void CheckWireTypeMatch(bond::detail::proto::WireType type, WireTypeMatchFlag mask)
 {
     using bond::detail::proto::WireType;
 
     BOOST_STATIC_ASSERT(boost::mpl::size<typename bond::schema<T>::type::fields>::value == 1);
 
     std::initializer_list<uint16_t> match{};
-    std::initializer_list<uint16_t> no_match{ typename bond::schema<T>::type::var::value::id == 1 };
+    std::initializer_list<uint16_t> no_match{ typename bond::schema<T>::type::var::value::id };
 
     google::protobuf::UInt32Value varint_value;
     SetValue(varint_value);
@@ -303,15 +302,15 @@ void CheckWireTypeMatch(bond::detail::proto::WireType type, WireTypeMatchMask ma
     CheckUnknownFields<T>(lengthdelim_value, type == WireType::LengthDelimited ? match : no_match, true);
 
     // relaxed match
-    CheckUnknownFields<T>(varint_value, (mask & WireTypeMatchMask::VarInt) ? match : no_match, false);
-    CheckUnknownFields<T>(fixed32_value, (mask & WireTypeMatchMask::Fixed32) ? match : no_match, false);
-    CheckUnknownFields<T>(fixed64_value, (mask & WireTypeMatchMask::Fixed64) ? match : no_match, false);
-    CheckUnknownFields<T>(lengthdelim_value, (mask & WireTypeMatchMask::LengthDelimited) ? match : no_match, false);
+    CheckUnknownFields<T>(varint_value, (mask & WireTypeMatchFlag::VarInt) ? match : no_match, false);
+    CheckUnknownFields<T>(fixed32_value, (mask & WireTypeMatchFlag::Fixed32) ? match : no_match, false);
+    CheckUnknownFields<T>(fixed64_value, (mask & WireTypeMatchFlag::Fixed64) ? match : no_match, false);
+    CheckUnknownFields<T>(lengthdelim_value, (mask & WireTypeMatchFlag::LengthDelimited) ? match : no_match, false);
 }
 
 template <typename T>
 typename boost::disable_if<bond::is_container<typename T::Schema::var::value::field_type> >::type
-CheckWireTypeMatch(WireTypeMatchMask mask)
+CheckWireTypeMatch(WireTypeMatchFlag mask)
 {
     using type_id = bond::get_type_id<typename T::Schema::var::value::field_type>;
 
@@ -325,7 +324,7 @@ CheckWireTypeMatch(WireTypeMatchMask mask)
 template <typename T>
 typename boost::enable_if_c<bond::is_list_container<typename T::Schema::var::value::field_type>::value
                             || bond::is_set_container<typename T::Schema::var::value::field_type>::value>::type
-CheckWireTypeMatch(WireTypeMatchMask mask)
+CheckWireTypeMatch(WireTypeMatchFlag mask)
 {
     using bond::detail::proto::Packing;
 
@@ -388,31 +387,31 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerUnsignedZigZagTests, T, unsigned_integer_ty
 
 BOOST_AUTO_TEST_CASE(BoolWireTypeMatchTests)
 {
-    CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<bool> >(WireTypeMatchMask::VarInt);
+    CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<bool> >(WireTypeMatchFlag::VarInt);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerWireTypeMatchTests, T, unsigned_integer_types)
 {
     CheckWireTypeMatch<unittest::Box<T> >(
-        WireTypeMatchMask::VarInt | WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+        WireTypeMatchFlag::VarInt | WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
     CheckWireTypeMatch<unittest::BoxFixed<T> >(
-        WireTypeMatchMask::VarInt | WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+        WireTypeMatchFlag::VarInt | WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
 }
 
 using SignedIntegerWireTypeMatchTests_Types = expand<signed_integer_types, int8_t>;
 BOOST_AUTO_TEST_CASE_TEMPLATE(SignedIntegerWireTypeMatchTests, T, SignedIntegerWireTypeMatchTests_Types)
 {
     CheckWireTypeMatch<unittest::Box<T> >(
-        WireTypeMatchMask::VarInt | WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+        WireTypeMatchFlag::VarInt | WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
     CheckWireTypeMatch<unittest::BoxFixed<T> >(
-        WireTypeMatchMask::VarInt | WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+        WireTypeMatchFlag::VarInt | WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
     CheckWireTypeMatch<unittest::BoxZigZag<T> >(
-        WireTypeMatchMask::VarInt | WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+        WireTypeMatchFlag::VarInt | WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(FloatPointIntegerWireTypeMatchTests, T, float_point_types)
 {
-    CheckWireTypeMatch<unittest::Box<T> >(WireTypeMatchMask::Fixed32 | WireTypeMatchMask::Fixed64);
+    CheckWireTypeMatch<unittest::Box<T> >(WireTypeMatchFlag::Fixed32 | WireTypeMatchFlag::Fixed64);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringTests, T, string_types)
@@ -422,7 +421,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(StringTests, T, string_types)
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringWireTypeMatchTests, T, string_types)
 {
-    CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<T> >(WireTypeMatchMask::LengthDelimited);
+    CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<T> >(WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(BlobTests, T, blob_types)
@@ -433,7 +432,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(BlobTests, T, blob_types)
 BOOST_AUTO_TEST_CASE_TEMPLATE(BlobWireTypeMatchTests, T, blob_types)
 {
     CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<T> >(
-        bond::detail::proto::WireType::LengthDelimited, WireTypeMatchMask::LengthDelimited);
+        bond::detail::proto::WireType::LengthDelimited, WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE(IntegerContainerTests)
@@ -476,39 +475,39 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerContainerWrongPackingTests, T,
 BOOST_AUTO_TEST_CASE(BoolContainerWireTypeMatchTests)
 {
     CheckWireTypeMatch<unittest::BoxWrongEncoding<std::vector<bool> > >(
-        WireTypeMatchMask::LengthDelimited | WireTypeMatchMask::VarInt);
+        WireTypeMatchFlag::LengthDelimited | WireTypeMatchFlag::VarInt);
 }
 
 BOOST_AUTO_TEST_CASE(BoolUnpackedContainerWireTypeMatchTests)
 {
     CheckWireTypeMatch<unittest::BoxUnpackedWrongEncoding<std::vector<bool> > >(
-        WireTypeMatchMask::LengthDelimited | WireTypeMatchMask::VarInt);
+        WireTypeMatchFlag::LengthDelimited | WireTypeMatchFlag::VarInt);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerContainerWireTypeMatchTests, T, unsigned_integer_types)
 {
-    CheckWireTypeMatch<unittest::Box<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxFixed<std::vector<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::Box<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxFixed<std::vector<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerUnpackedContainerWireTypeMatchTests, T, unsigned_integer_types)
 {
-    CheckWireTypeMatch<unittest::BoxUnpacked<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::vector<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::BoxUnpacked<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::vector<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(SignedIntegerContainerWireTypeMatchTests, T, signed_integer_types)
 {
-    CheckWireTypeMatch<unittest::Box<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxFixed<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxZigZag<std::vector<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::Box<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxFixed<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxZigZag<std::vector<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(SignedIntegerUnpackedContainerWireTypeMatchTests, T, signed_integer_types)
 {
-    CheckWireTypeMatch<unittest::BoxUnpacked<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::vector<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedZigZag<std::vector<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::BoxUnpacked<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::vector<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedZigZag<std::vector<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE(IntegerSetContainerTests)
@@ -554,19 +553,19 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(IntegerSetContainerWrongPackingTests, T,
 BOOST_AUTO_TEST_CASE(BoolUnpackedSetContainerWireTypeMatchTests)
 {
     CheckWireTypeMatch<unittest::BoxUnpackedWrongEncoding<std::set<bool> > >(
-        WireTypeMatchMask::LengthDelimited | WireTypeMatchMask::VarInt);
+        WireTypeMatchFlag::LengthDelimited | WireTypeMatchFlag::VarInt);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerSetContainerWireTypeMatchTests, T, unsigned_integer_types)
 {
-    CheckWireTypeMatch<unittest::Box<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxFixed<std::set<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::Box<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxFixed<std::set<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(UnsignedIntegerUnpackedSetContainerWireTypeMatchTests, T, unsigned_integer_types)
 {
-    CheckWireTypeMatch<unittest::BoxUnpacked<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::set<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::BoxUnpacked<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::set<T> > >(WireTypeMatchFlag::All);
 }
 
 using SignedIntegerSetContainerWireTypeMatchTests_Types =
@@ -574,9 +573,9 @@ using SignedIntegerSetContainerWireTypeMatchTests_Types =
 BOOST_AUTO_TEST_CASE_TEMPLATE(SignedIntegerSetContainerWireTypeMatchTests, T,
     SignedIntegerSetContainerWireTypeMatchTests_Types)
 {
-    CheckWireTypeMatch<unittest::Box<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxFixed<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxZigZag<std::set<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::Box<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxFixed<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxZigZag<std::set<T> > >(WireTypeMatchFlag::All);
 }
 
 using SignedIntegerUnpackedSetContainerWireTypeMatchTests_Types =
@@ -584,9 +583,9 @@ using SignedIntegerUnpackedSetContainerWireTypeMatchTests_Types =
 BOOST_AUTO_TEST_CASE_TEMPLATE(SignedIntegerUnpackedSetContainerWireTypeMatchTests, T,
     SignedIntegerUnpackedSetContainerWireTypeMatchTests_Types)
 {
-    CheckWireTypeMatch<unittest::BoxUnpacked<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::set<T> > >(WireTypeMatchMask::All);
-    CheckWireTypeMatch<unittest::BoxUnpackedZigZag<std::set<T> > >(WireTypeMatchMask::All);
+    CheckWireTypeMatch<unittest::BoxUnpacked<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedFixed<std::set<T> > >(WireTypeMatchFlag::All);
+    CheckWireTypeMatch<unittest::BoxUnpackedZigZag<std::set<T> > >(WireTypeMatchFlag::All);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringContainerTests, T, string_types)
@@ -599,7 +598,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(StringContainerTests, T, string_types)
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringContainerWireTypeMatchTests, T, string_types)
 {
     CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<std::vector<T> > >(
-        WireTypeMatchMask::LengthDelimited);
+        WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringSetContainerTests, T, string_types)
@@ -612,7 +611,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(StringSetContainerTests, T, string_types)
 BOOST_AUTO_TEST_CASE_TEMPLATE(StringSetContainerWireTypeMatchTests, T, string_types)
 {
     CheckWireTypeMatch<unittest::BoxWrongPackingWrongEncoding<std::set<T> > >(
-        WireTypeMatchMask::LengthDelimited);
+        WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(BlobContainerTests, T, blob_types)
@@ -640,7 +639,7 @@ BOOST_AUTO_TEST_CASE(StructContainerTests)
 BOOST_AUTO_TEST_CASE(StructWireTypeMatchTests)
 {
     CheckWireTypeMatch<unittest::Box<unittest::Box<uint32_t> > >(
-        WireTypeMatchMask::LengthDelimited);
+        WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE(NestedStructTests)
