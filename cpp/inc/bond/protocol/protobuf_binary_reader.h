@@ -560,13 +560,11 @@ namespace bond
     {
         BOOST_VERIFY(size == 0);
 
-        resize_list(var, 0);
+        resize_list(var, element.GetInput().GetSize());
 
-        while (element.GetInput().GetSize() != 0)
+        for (enumerator<X> items(var); items.more(); )
         {
-            blob::value_type byte;
-            element.GetInput().ReadByte(byte);
-            container_append(var, byte);
+            element.GetInput().ReadByte(items.next());
         }
     }
 
