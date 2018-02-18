@@ -637,9 +637,15 @@ BOOST_AUTO_TEST_CASE(StructContainerTests)
         unittest::BoxWrongPackingWrongEncoding<std::vector<unittest::IntegersContainer> > >();
 }
 
-BOOST_AUTO_TEST_CASE(StructWireTypeMatchTests)
+BOOST_AUTO_TEST_CASE(StructContainerWireTypeMatchTests)
 {
-    CheckWireTypeMatch<unittest::Box<unittest::Box<uint32_t> > >(
+    CheckWireTypeMatch<unittest::Box<std::vector<unittest::Box<uint32_t> > > >(
+        WireTypeMatchFlag::LengthDelimited);
+}
+
+BOOST_AUTO_TEST_CASE(StructSetContainerWireTypeMatchTests)
+{
+    CheckWireTypeMatch<unittest::Box<std::set<unittest::Box<uint32_t> > > >(
         WireTypeMatchFlag::LengthDelimited);
 }
 
@@ -681,6 +687,12 @@ BOOST_AUTO_TEST_CASE(NestedStructTests)
             BOOST_CHECK((bond_struct == bond_struct2));
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE(StructWireTypeMatchTests)
+{
+    CheckWireTypeMatch<unittest::Box<unittest::Box<uint32_t> > >(
+        WireTypeMatchFlag::LengthDelimited);
 }
 
 BOOST_AUTO_TEST_CASE(NullableTests)
