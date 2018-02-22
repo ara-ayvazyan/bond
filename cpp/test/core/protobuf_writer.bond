@@ -11,10 +11,34 @@ struct BoxZigZag<T>
     1: T value;
 }
 
+struct BoxZigZagKey<K, V>
+{
+    [ProtoEncodeKey("ZigZag")]
+    1: map<K, V> value;
+}
+
+struct BoxZigZagValue<K, V>
+{
+    [ProtoEncodeValue("ZigZag")]
+    1: map<K, V> value;
+}
+
 struct BoxFixed<T>
 {
     [ProtoEncode("Fixed")]
     1: T value;
+}
+
+struct BoxFixedKey<K, V>
+{
+    [ProtoEncodeKey("Fixed")]
+    1: map<K, V> value;
+}
+
+struct BoxFixedValue<K, V>
+{
+    [ProtoEncodeValue("Fixed")]
+    1: map<K, V> value;
 }
 
 struct BoxWrongEncoding<T>

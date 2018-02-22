@@ -189,6 +189,86 @@ message StructMapValue
     map<uint32, IntegersContainer> value = 1;
 }
 
+message MapKeyVarInt
+{
+    message Entry
+    {
+        uint32 key = 1;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapKeyFixed32
+{
+    message Entry
+    {
+        fixed32 key = 1;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapKeyFixed64
+{
+    message Entry
+    {
+        fixed64 key = 1;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapKeyLengthDelim
+{
+    message Entry
+    {
+        bytes key = 1;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapValueVarInt
+{
+    message Entry
+    {
+        uint32 value = 2;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapValueFixed32
+{
+    message Entry
+    {
+        fixed32 value = 2;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapValueFixed64
+{
+    message Entry
+    {
+        fixed64 value = 2;
+    }
+
+    repeated Entry value = 1;
+}
+
+message MapValueLengthDelim
+{
+    message Entry
+    {
+        bytes value = 2;
+    }
+
+    repeated Entry value = 1;
+}
+
 message ComplexItem
 {
     Integers s1 = 1;
