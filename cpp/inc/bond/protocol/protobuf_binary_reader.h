@@ -7,8 +7,8 @@
 
 #include "detail/protobuf_pair.h"
 #include "detail/protobuf_utils.h"
-#include "protobuf_parser.h"
 #include "detail/simple_array.h"
+#include "protobuf_parser.h"
 
 #include <boost/locale.hpp>
 

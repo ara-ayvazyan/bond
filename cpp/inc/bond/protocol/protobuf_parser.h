@@ -5,8 +5,6 @@
 
 #include <bond/core/config.h>
 
-#include "detail/protobuf_field_enumerator.h"
-
 #include <bond/core/bond_types.h>
 #include <bond/core/value.h>
 
@@ -533,12 +531,21 @@ namespace bond
         template <typename Transform>
         void ReadFields(const RuntimeSchema& schema, const Transform& transform)
         {
+            const auto& fields = schema.GetStruct().fields;
+
             WireType type;
             uint16_t id;
 
-            for (auto fields = detail::proto::EnumerateFields(schema); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
+            for (auto it = fields.begin(); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
             {
-                if (const FieldDef* field = fields.find(id))
+                if (it == fields.end()
+                    || (it->id != id && (++it == fields.end() || it->id != id)))
+                {
+                    it = std::lower_bound(fields.begin(), fields.end(), id,
+                        [](const FieldDef& f, uint16_t id) { return f.id < id; });
+                }
+
+                if (const FieldDef* field = (it != fields.end() && it->id == id ? &*it : nullptr))
                 {
                     if (field->type.id == BT_STRUCT)
                     {
