@@ -408,8 +408,8 @@ namespace bond
                 uint64_t tag;
                 ReadVarInt(tag);
 
-                auto raw_type = static_cast<WireType>(tag & 0x7);
-                switch (raw_type)
+                const auto type = static_cast<WireType>(tag & 0x7);
+                switch (type)
                 {
                 case WireType::VarInt:
                 case WireType::Fixed32:
@@ -426,14 +426,14 @@ namespace bond
                     break;
                 }
 
-                auto raw_id = tag >> 3;
-                if (raw_id > (std::numeric_limits<uint16_t>::max)())
+                const auto id = tag >> 3;
+                if (id > (std::numeric_limits<uint16_t>::max)())
                 {
                     BOND_THROW(CoreException, "Field ordinal does not fit in 16 bits.");
                 }
 
-                _type = static_cast<WireType>(raw_type);
-                _id = static_cast<uint16_t>(raw_id);
+                _type = type;
+                _id = static_cast<uint16_t>(id);
                 _encoding = _key_encoding = detail::proto::Unavailable<Encoding>::value;
 
                 return true;
@@ -459,7 +459,6 @@ namespace bond
                 break;
 
             case WireType::LengthDelimited:
-                BOOST_ASSERT(_size != 0);
                 _input.Skip(_size);
                 Consume(_size);
                 break;
