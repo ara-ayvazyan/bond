@@ -214,6 +214,17 @@ void CheckUnsupportedType()
     CheckUnsupportedType<Bond, RuntimeOnly>(proto_struct);
 }
 
+const char* GetMagicBytes()
+{
+    // The payload will successfully be deserialized for any wire type into non-default value.
+    // 1. varint will read single \x8
+    // 2. fixed32 will read first 4 bytes or all 8 (when packed)
+    // 3. fixed64 will read all 8 bytes
+    // 4. lengthdelim will read either the whole content,
+    //    or when Box<uint32_t> is used - 4 instances of \x8\x1
+    return "\x8\x1\x8\x1\x8\x1\x8\x1";
+}
+
 template <typename Proto>
 void SetValue(Proto& value)
 {
@@ -227,7 +238,7 @@ void SetValue(google::protobuf::StringValue& value)
 
 void SetValue(google::protobuf::BytesValue& value)
 {
-    value.set_value("\x1\x1\x1\x1\x1\x1\x1\x1");
+    value.set_value(GetMagicBytes());
 }
 
 void SetValue(unittest::proto::BlobMapValue& value)
@@ -376,7 +387,7 @@ CheckMapKeyWireTypeMatch(WireTypeMatchFlag mask)
             varint_value.add_value()->set_key(1);
             fixed32_value.add_value()->set_key(1);
             fixed64_value.add_value()->set_key(1);
-            lengthdelim_value.add_value()->set_key("\x1\x1\x1\x1\x1\x1\x1\x1");
+            lengthdelim_value.add_value()->set_key(GetMagicBytes());
         }
 
         unittest::proto::MapKeyVarInt varint_value;
@@ -385,7 +396,7 @@ CheckMapKeyWireTypeMatch(WireTypeMatchFlag mask)
         unittest::proto::MapKeyLengthDelim lengthdelim_value;
     };
 
-    using type_id = bond::get_type_id<typename typename T::Schema::var::value::field_type::key_type>;
+    using type_id = bond::get_type_id<typename T::Schema::var::value::field_type::key_type>;
 
     CheckWireTypeMatch<T, Values>(
         bond::detail::proto::GetWireType(
@@ -405,7 +416,7 @@ CheckMapValueWireTypeMatch(WireTypeMatchFlag mask)
             varint_value.add_value()->set_value(1);
             fixed32_value.add_value()->set_value(1);
             fixed64_value.add_value()->set_value(1);
-            lengthdelim_value.add_value()->set_value("\x1\x1\x1\x1\x1\x1\x1\x1");
+            lengthdelim_value.add_value()->set_value(GetMagicBytes());
         }
 
         unittest::proto::MapValueVarInt varint_value;
@@ -414,12 +425,15 @@ CheckMapValueWireTypeMatch(WireTypeMatchFlag mask)
         unittest::proto::MapValueLengthDelim lengthdelim_value;
     };
 
-    using type_id = bond::get_type_id<typename typename T::Schema::var::value::field_type::mapped_type>;
+    using type_id = bond::get_type_id<typename T::Schema::var::value::field_type::mapped_type>;
+    using is_blob = bond::detail::proto::is_blob_type<typename T::Schema::var::value::field_type::mapped_type>;
 
     CheckWireTypeMatch<T, Values>(
-        bond::detail::proto::GetWireType(
-            type_id::value,
-            bond::detail::proto::ReadValueEncoding(type_id::value, &T::Schema::var::value::metadata)),
+        is_blob::value
+            ? bond::detail::proto::WireType::LengthDelimited
+            : bond::detail::proto::GetWireType(
+                type_id::value,
+                bond::detail::proto::ReadValueEncoding(type_id::value, &T::Schema::var::value::metadata)),
         mask);
 }
 
@@ -860,11 +874,23 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(BlobMapValueTests, T, blob_types)
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, T> > >();
 }
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(BlobMapValueWireTypeMatchTests, T, blob_types)
+{
+    CheckMapValueWireTypeMatch<unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, T> > >(
+        WireTypeMatchFlag::LengthDelimited);
+}
+
 BOOST_AUTO_TEST_CASE(StructMapValueTests)
 {
     CheckBinaryFormat<
         unittest::proto::StructMapValue,
         unittest::BoxWrongPackingWrongValueEncoding<std::map<uint32_t, unittest::IntegersContainer> > >();
+}
+
+BOOST_AUTO_TEST_CASE(StructMapValueWireTypeMatchTests)
+{
+    CheckMapValueWireTypeMatch<unittest::Box<std::map<uint32_t, unittest::Box<uint32_t> > > >(
+        WireTypeMatchFlag::LengthDelimited);
 }
 
 using NestedVectorVectorTests_Types = expand<basic_types, bond::blob, unittest::IntegersContainer>;
