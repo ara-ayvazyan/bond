@@ -392,7 +392,8 @@ namespace bond
                 }
                 else // Head::id > id
                 {
-                    return !std::is_same<Fields, typename boost::mpl::begin<typename Schema::fields>::type>::value;
+                    return !std::is_same<Fields, typename boost::mpl::begin<typename Schema::fields>::type>::value
+                        || ReadFields<Schema>(typename boost::mpl::end<typename Schema::fields>::type{}, transform, type, id);
                 }
             }
             while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id));

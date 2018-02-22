@@ -596,16 +596,6 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename Transform, typename T, typename Buffer>
-    inline void DeserializeElements(
-        const Transform& /*transform*/,
-        const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
-        uint32_t /*size*/)
-    {
-        BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
-    }
-
-
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
@@ -619,6 +609,13 @@ namespace bond
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         DeserializeElements<Protocols>(var, element, 0);
+    }
+
+    template <typename Protocols, typename X, typename T, typename Buffer>
+    typename boost::disable_if<is_container<X> >::type
+    inline DeserializeContainer(X& /*var*/, const T& /*element*/, ProtobufBinaryReader<Buffer>& /*input*/)
+    {
+        BOOST_STATIC_ASSERT(!"No transcoding is supported");
     }
 
 
@@ -657,17 +654,6 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename Transform, typename Key, typename T, typename Buffer>
-    inline void DeserializeMapElements(
-        const Transform& /*transform*/,
-        const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
-        const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
-        uint32_t /*size*/)
-    {
-        BOOST_STATIC_ASSERT("No transcoding is supported for ProtobufBinaryReader.");
-    }
-
-
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
@@ -681,6 +667,14 @@ namespace bond
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MapByKey<Protocols>(var, keyType, element, input, 0);
+    }
+
+
+    template <typename Protocols, typename Transform, typename T, typename Buffer>
+    inline void DeserializeMap(
+        const Transform& /*transform*/, BondDataType /*keyType*/, const T& /*element*/, ProtobufBinaryReader<Buffer>& /*input*/)
+    {
+        BOOST_STATIC_ASSERT(!"No transcoding is supported");
     }
 
 } // namespace bond
