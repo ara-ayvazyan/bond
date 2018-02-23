@@ -72,12 +72,84 @@ namespace proto
     template <typename T>
     class RequiredFieldUnorderedValiadator
     {
+        using count = boost::mpl::count_if<typename schema<T>::type::fields, is_required_field<_> >;
+
+    public:
+        BOOST_STATIC_ASSERT(!no_required_fields<T>::value);
+        BOOST_STATIC_ASSERT(count::value != 0);
+
+        void Begin(const T& /*var*/)
+        {
+            _ids = RequiredFieldIds<T>::instance;
+            _it = _ids.begin();
+            _count = 0;
+        }
+
+        template <typename Head>
+        void Validate()
+        {
+            BOOST_STATIC_ASSERT(std::is_same<typename Head::field_modifier,
+                                            reflection::required_field_modifier>::value);
+
+            NextField(Head::id);
+
+            if (!_it->second)
+            {
+                _it->second = true;
+                ++_count;
+            }
+        }
+
+        void End() const
+        {
+            if (_count != count::value)
+            {
+                BOND_THROW(CoreException,
+                    "De-serialization failed: one or more required fields are missing from "
+                    << schema<T>::type::metadata.qualified_name);
+            }
+        }
+
+        bool operator==(const RequiredFieldUnorderedValiadator&) const
+        {
+            BOOST_ASSERT(false);
+            return false;
+        }
+
+    private:
+        void NextField(uint16_t id)
+        {
+            if (_it == _ids.end()
+                || (_it->first != id && (++_it == _ids.end() || _it->first != id)))
+            {
+                _it = std::lower_bound(_ids.begin(), _ids.end(), id,
+                    [](const std::pair<uint16_t, bool>& pair, uint16_t id) { return pair.first < id; });
+            }
+
+            BOOST_ASSERT(_it != _ids.end());
+            BOOST_ASSERT(_it->first == id);
+        }
+
+        typename RequiredFieldIds<T>::type::iterator _it;
+        uint16_t _count;
+        typename RequiredFieldIds<T>::type _ids;
+    };
+
+
+    template <typename T>
+    class RequiredFieldValiadator
+    {
     protected:
         template <typename U>
         struct rebind
         {
-            using type = RequiredFieldUnorderedValiadator<U>;
+            using type = RequiredFieldValiadator<U>;
         };
+
+        RequiredFieldValiadator()
+        {
+            Init();
+        }
 
         template <typename U = T>
         typename boost::enable_if<no_required_fields<U> >::type
@@ -86,11 +158,9 @@ namespace proto
 
         template <typename U = T>
         typename boost::disable_if<no_required_fields<U> >::type
-        Begin(const T& /*var*/) const
+        Begin(const T& var) const
         {
-            _ids = RequiredFieldIds<T>::instance;
-            _it = GetIds().data();
-            _count = 0;
+            _impl.template unsafe_cast<RequiredFieldUnorderedValiadator<T> >().Begin(var);
         }
 
         template <typename Head>
@@ -98,13 +168,7 @@ namespace proto
                                                 reflection::required_field_modifier> >::type
         Validate() const
         {
-            NextField(Head::id);
-
-            if (!_it->second)
-            {
-                _it->second = true;
-                ++_count;
-            }
+            _impl.template unsafe_cast<RequiredFieldUnorderedValiadator<T> >().template Validate<Head>();
         }
 
         template <typename Head>
@@ -122,53 +186,26 @@ namespace proto
         typename boost::disable_if<no_required_fields<U> >::type
         End() const
         {
-            using Count = boost::mpl::count_if<typename schema<T>::type::fields, is_required_field<_> >;
-
-            if (_count != Count::value)
-            {
-                BOND_THROW(CoreException,
-                    "De-serialization failed: one or more required fields are missing from "
-                    << schema<T>::type::metadata.qualified_name);
-            }
+            _impl.template unsafe_cast<RequiredFieldUnorderedValiadator<T> >().End();
         }
 
     private:
-        template <typename T>
+        template <typename U>
         using always_one = std::integral_constant<uint16_t, 1>;
 
-        using storage_size = std::integral_constant<std::size_t, sizeof(std::array<std::pair<uint16_t, bool>, 8>)>;
+        template <typename U = T>
+        typename boost::enable_if<no_required_fields<U> >::type
+        Init()
+        {}
 
         template <typename U = T>
-        typename RequiredFieldIds<U>::type& GetIds() const
+        typename boost::disable_if<no_required_fields<U> >::type
+        Init()
         {
-            BOOST_STATIC_ASSERT(std::is_same<T, U>::value);
-            auto ids = _ids.template cast<typename RequiredFieldIds<T>::type>();
-            BOOST_ASSERT(ids);
-            return *ids;
+            _impl = RequiredFieldUnorderedValiadator<T>{};
         }
 
-        void NextField(uint16_t id) const
-        {
-            using Count = boost::mpl::count_if<typename schema<T>::type::fields, is_required_field<_> >;
-
-            auto& ids = GetIds();
-            const auto begin = ids.data();
-            const auto end = ids.data() + Count::value;
-
-            if (_it == end
-                || (_it->first != id && (++_it == end || _it->first != id)))
-            {
-                _it = std::lower_bound(begin, end, id,
-                    [](const std::pair<uint16_t, bool>& pair, uint16_t id) { return pair.first < id; });
-            }
-
-            BOOST_ASSERT(_it != end);
-            BOOST_ASSERT(_it->first == id);
-        }
-
-        mutable any<always_one, storage_size::value> _ids;
-        mutable std::pair<uint16_t, bool>* _it;
-        mutable uint16_t _count;
+        mutable any<always_one, 64> _impl;
     };
 
 } // namespace proto

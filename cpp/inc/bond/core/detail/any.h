@@ -79,13 +79,31 @@ public:
     template <typename T>
     T* cast() BOND_NOEXCEPT
     {
-        return TypeId<T>::value == _id ? functions::template table<T>::unsafe_cast(*this) : nullptr;
+        return TypeId<T>::value == _id ? &unsafe_cast<T>() : nullptr;
     }
 
     template <typename T>
     const T* cast() const BOND_NOEXCEPT
     {
-        return TypeId<T>::value == _id ? functions::template table<T>::unsafe_cast(*this) : nullptr;
+        return TypeId<T>::value == _id ? &unsafe_cast<T>() : nullptr;
+    }
+
+    template <typename T>
+    T& unsafe_cast() BOND_NOEXCEPT
+    {
+        BOOST_ASSERT(TypeId<T>::value == _id);
+        const auto ptr = functions::template table<T>::unsafe_cast(*this);
+        BOOST_ASSERT(ptr);
+        return *ptr;
+    }
+
+    template <typename T>
+    const T& unsafe_cast() const BOND_NOEXCEPT
+    {
+        BOOST_ASSERT(TypeId<T>::value == _id);
+        const auto ptr = functions::template table<T>::unsafe_cast(*this);
+        BOOST_ASSERT(ptr);
+        return *ptr;
     }
 
     bool operator==(const any& other) const
