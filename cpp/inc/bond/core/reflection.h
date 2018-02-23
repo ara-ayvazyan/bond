@@ -328,19 +328,29 @@ field_id<T, typename boost::mpl::end<T>::type>
     : std::integral_constant<uint16_t, invalid_field_id> {};
 
 
+template <typename Field> struct
+is_required_field
+    : std::is_same<typename Field::field_modifier, typename reflection::required_field_modifier> {};
+
+
 template <typename T, uint16_t minId = 0> struct
 next_required_field
 {
 private:
     template <typename Field> struct
     is_next_required
-        : std::integral_constant<bool,
-            Field::id >= minId
-            && std::is_same<typename Field::field_modifier, typename reflection::required_field_modifier>::value> {};
+        : std::integral_constant<bool, Field::id >= minId && is_required_field<Field>::value> {};
 
 public:
     BOND_STATIC_CONSTEXPR uint16_t value = field_id<T, typename boost::mpl::find_if<T, is_next_required<_> >::type>::value;
 };
+
+
+template <typename T> struct
+no_required_fields
+    : std::is_same<
+        typename boost::mpl::find_if<typename schema<T>::type::fields, is_required_field<_> >::type,
+        typename boost::mpl::end<typename schema<T>::type::fields>::type> {};
 
 
 struct no_base {};

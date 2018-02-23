@@ -9,6 +9,7 @@
 #include "detail/protobuf_utils.h"
 #include "detail/simple_array.h"
 #include "protobuf_parser.h"
+#include "protobuf_field_validator.h"
 
 #include <boost/locale.hpp>
 
@@ -489,17 +490,21 @@ namespace bond
     namespace detail
     {
         template <typename Protocols, typename T, typename X, typename Buffer>
-        bool ApplyTransform(const bond::To<T, Protocols>& transform, const bonded<X, ProtobufBinaryReader<Buffer>&>& bonded)
+        inline bool ApplyTransform(
+            const bond::To<T, Protocols>& transform, const bonded<X, ProtobufBinaryReader<Buffer>&>& bonded)
         {
-            return ApplyTransform<Protocols>(bond::To<T, Protocols, UnorderedRequiredFieldValiadator<T> >{ transform }, bonded);
+            return ApplyTransform<Protocols>(
+                bond::To<T, Protocols, proto::RequiredFieldUnorderedValiadator<T> >{ transform }, bonded);
         }
 
         template <typename Protocols, typename T, typename X, typename Buffer>
-        bool ApplyTransform(const bond::To<T, bond::Protocols<ProtobufBinaryReader<Buffer> > >& transform, const bonded<X>& bonded)
+        inline bool ApplyTransform(
+            const bond::To<T, bond::Protocols<ProtobufBinaryReader<Buffer> > >& transform, const bonded<X>& bonded)
         {
             BOOST_STATIC_ASSERT(std::is_same<Protocols, bond::Protocols<ProtobufBinaryReader<Buffer> > >::value);
 
-            return ApplyTransform<Protocols>(bond::To<T, Protocols, UnorderedRequiredFieldValiadator<T> >{ transform }, bonded);
+            return ApplyTransform<Protocols>(
+                bond::To<T, Protocols, proto::RequiredFieldUnorderedValiadator<T> >{ transform }, bonded);
         }
 
     } // namesace detail

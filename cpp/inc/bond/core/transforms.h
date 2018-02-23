@@ -403,7 +403,6 @@ protected:
         using type = RequiredFieldValiadator<U>;
     };
 
-
     void Begin(const T& var) const
     {
 #ifndef BOND_UNIT_TEST_ONLY_PERMIT_OBJECT_REUSE
@@ -415,7 +414,7 @@ protected:
 #endif
         (void)var;
 
-        _required = next_required_field<typename schema<T>::type::fields>::value;
+        Begin();
     }
 
     template <typename Head>
@@ -429,31 +428,39 @@ protected:
             MissingFieldException();
     }
 
-
-    template <typename Schema>
-    typename boost::enable_if_c<next_required_field<typename Schema::fields>::value
-                             != invalid_field_id>::type
-    Validate() const
-    {
-        if (_required != invalid_field_id)
-            MissingFieldException();
-    }
-
-
     template <typename Head>
     typename boost::disable_if<std::is_same<typename Head::field_modifier,
                                             reflection::required_field_modifier> >::type
     Validate() const
     {}
 
-
-    template <typename Schema>
-    typename boost::disable_if_c<next_required_field<typename Schema::fields>::value
-                              != invalid_field_id>::type
-    Validate() const
+    template <typename U = T>
+    typename boost::enable_if<no_required_fields<U> >::type
+    End() const
     {}
 
+    template <typename U = T>
+    typename boost::disable_if<no_required_fields<U> >::type
+    End() const
+    {
+        if (_required != invalid_field_id)
+            MissingFieldException();
+    }
+
 private:
+    template <typename U = T>
+    typename boost::enable_if<no_required_fields<U> >::type
+    Begin() const
+    {}
+
+    template <typename U = T>
+    typename boost::disable_if<no_required_fields<U> >::type
+    Begin() const
+    {
+        _required = next_required_field<typename schema<T>::type::fields>::value;
+        BOOST_ASSERT(_required != invalid_field_id);
+    }
+
     BOND_NORETURN void MissingFieldException() const;
 
     mutable uint16_t _required;
@@ -539,7 +546,7 @@ public:
 
     void End() const
     {
-        Validator::template Validate<typename schema<T>::type>();
+        Validator::End();
     }
 
     template <typename X>

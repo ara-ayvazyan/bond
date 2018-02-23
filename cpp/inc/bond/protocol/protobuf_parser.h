@@ -222,62 +222,12 @@ namespace bond
             : std::false_type {};
 
         template <typename T> struct
-        is_nested_blob_type<T, typename boost::enable_if<is_list_container<T> >::type>
-            : is_blob_type<typename element_type<T>::type> {};
-
-        template <typename T> struct
-        is_nested_blob_type<T, typename boost::enable_if<is_set_container<T> >::type>
+        is_nested_blob_type<T, typename boost::enable_if_c<
+                is_list_container<T>::value || is_set_container<T>::value>::type>
             : is_blob_type<typename element_type<T>::type> {};
 
     } // namespace proto
     } // namespace detail
-
-
-    template <typename T>
-    class UnorderedRequiredFieldValiadator
-    {
-    protected:
-        template <typename U>
-        struct rebind
-        {
-            using type = UnorderedRequiredFieldValiadator<U>;
-        };
-
-        void Begin(const T& /*var*/) const
-        {
-            // TODO:
-        }
-
-        template <typename Head>
-        typename boost::enable_if<std::is_same<typename Head::field_modifier,
-                                               reflection::required_field_modifier> >::type
-        Validate() const
-        {
-            // TODO:
-        }
-
-        template <typename Schema>
-        typename boost::enable_if_c<next_required_field<typename Schema::fields>::value
-                                    != invalid_field_id>::type
-        Validate() const
-        {
-            // TODO:
-        }
-
-        template <typename Head>
-        typename boost::disable_if<std::is_same<typename Head::field_modifier,
-                                                reflection::required_field_modifier> >::type
-        Validate() const
-        {}
-
-        template <typename Schema>
-        typename boost::disable_if_c<next_required_field<typename Schema::fields>::value
-                                    != invalid_field_id>::type
-        Validate() const
-        {}
-
-    private:
-    };
 
 
     template <typename Input>
