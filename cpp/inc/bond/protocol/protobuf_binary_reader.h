@@ -619,7 +619,7 @@ namespace bond
     typename boost::disable_if<is_container<X> >::type
     inline DeserializeContainer(X& /*var*/, const T& /*element*/, ProtobufBinaryReader<Buffer>& /*input*/)
     {
-        BOOST_STATIC_ASSERT(!"No transcoding is supported");
+        BOOST_STATIC_ASSERT(detail::mpl::always_false<X>::value); // No transcoding is supported
     }
 
 
@@ -678,7 +678,7 @@ namespace bond
     inline void DeserializeMap(
         const Transform& /*transform*/, BondDataType /*keyType*/, const T& /*element*/, ProtobufBinaryReader<Buffer>& /*input*/)
     {
-        BOOST_STATIC_ASSERT(!"No transcoding is supported");
+        BOOST_STATIC_ASSERT(detail::mpl::always_false<T>::value); // No transcoding is supported
     }
 
 } // namespace bond
