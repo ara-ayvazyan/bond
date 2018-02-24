@@ -321,7 +321,7 @@ namespace bond
         }
 
         template <typename Schema, typename Fields, typename Transform>
-        bool ReadFields(const Fields&, const Transform& transform, WireType& type, uint16_t& id)
+        bool ReadFields(const Fields&, const Transform& transform, WireType& type, uint16_t& id, bool passed = false)
         {
             using Head = typename boost::mpl::deref<Fields>::type;
 
@@ -333,15 +333,19 @@ namespace bond
                     {
                         transform.UnknownField(Head::id, value<void, Input>{ _input, BT_UNAVAILABLE });
                     }
+
+                    if (!passed)
+                    {
+                        passed = true;
+                    }
                 }
                 else if (Head::id < id)
                 {
-                    return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id);
+                    return ReadFields<Schema>(typename boost::mpl::next<Fields>::type{}, transform, type, id, passed);
                 }
                 else // Head::id > id
                 {
-                    return !std::is_same<Fields, typename boost::mpl::begin<typename Schema::fields>::type>::value
-                        || ReadFields<Schema>(typename boost::mpl::end<typename Schema::fields>::type{}, transform, type, id);
+                    return passed || ReadFields<Schema>(typename boost::mpl::end<typename Schema::fields>::type{}, transform, type, id);
                 }
             }
             while (_input.ReadFieldEnd(), _input.ReadFieldBegin(type, id));
@@ -350,7 +354,7 @@ namespace bond
         }
 
         template <typename Schema, typename Transform>
-        bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform& transform, WireType& type, uint16_t& id)
+        bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform& transform, WireType& type, uint16_t& id, bool /*passed*/ = false)
         {
             transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
             return _input.ReadFieldEnd(), _input.ReadFieldBegin(type, id);
