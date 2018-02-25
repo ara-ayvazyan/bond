@@ -380,6 +380,16 @@ inline void SkipElements(BondDataType keyType, const E& element, Reader& input, 
     }
 }
 
+template <typename Key, typename E>
+inline void SkipElements(const Key& key, const E& element, uint32_t size)
+{
+    while (size--)
+    {
+        key.Skip();
+        element.Skip();
+    }
+}
+
 template <typename Protocols, typename T, typename E, typename Reader>
 typename boost::enable_if<is_type_alias<typename element_type<T>::type::first_type> >::type
 inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& input, uint32_t size)
@@ -591,11 +601,7 @@ template <typename Protocols, typename T, typename E, typename Reader>
 typename boost::disable_if_c<!is_map_container<T>::value || is_map_element_matching<E, T>::value>::type
 inline MapByKey(T&, BondDataType keyType, const E& element, Reader& input, uint32_t size)
 {
-    while (size--)
-    {
-        input.Skip(keyType);
-        element.Skip();
-    }
+    SkipElements(keyType, element, input, size);
 }
 
 

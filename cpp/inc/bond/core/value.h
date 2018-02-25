@@ -874,11 +874,7 @@ template <typename Protocols, typename X, typename Key, typename T>
 typename boost::disable_if<is_map_key_matching<Key, X> >::type
 inline DeserializeMapElements(X&, const Key& key, const T& element, uint32_t size)
 {
-    while (size--)
-    {
-        key.Skip();
-        element.Skip();
-    }
+    detail::SkipElements(key, element, size);
 }
 
 

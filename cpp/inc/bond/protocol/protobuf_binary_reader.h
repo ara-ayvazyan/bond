@@ -257,6 +257,39 @@ namespace bond
             _size -= sizeof(blob::value_type);
         }
 
+        void Skip()
+        {
+            switch (_type)
+            {
+            case WireType::VarInt:
+                {
+                    uint64_t value;
+                    ReadVarInt(value);
+                }
+                break;
+
+            case WireType::Fixed64:
+                _input.Skip(sizeof(uint64_t));
+                Consume(sizeof(uint64_t));
+                break;
+
+            case WireType::LengthDelimited:
+                _input.Skip(_size);
+                Consume(_size);
+                _size = 0;
+                break;
+
+            case WireType::Fixed32:
+                _input.Skip(sizeof(uint32_t));
+                Consume(sizeof(uint32_t));
+                break;
+
+            default:
+                BOOST_ASSERT(false);
+                break;
+            }
+        }
+
         template <typename T>
         void Skip()
         {
@@ -443,38 +476,6 @@ namespace bond
             return false;
         }
 
-        void Skip()
-        {
-            switch (_type)
-            {
-            case WireType::VarInt:
-                {
-                    uint64_t value;
-                    ReadVarInt(value);
-                }
-                break;
-
-            case WireType::Fixed64:
-                _input.Skip(sizeof(uint64_t));
-                Consume(sizeof(uint64_t));
-                break;
-
-            case WireType::LengthDelimited:
-                _input.Skip(_size);
-                Consume(_size);
-                break;
-
-            case WireType::Fixed32:
-                _input.Skip(sizeof(uint32_t));
-                Consume(sizeof(uint32_t));
-                break;
-
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
-        }
-
 
         Buffer _input;
         uint32_t _size;
@@ -513,40 +514,62 @@ namespace bond
     namespace detail
     {
         template <typename Buffer>
-        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& /*input*/, uint32_t /*size*/)
+        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& input, uint32_t size)
         {
-            BOOST_ASSERT(false);
+            BOOST_VERIFY(size == 0);
+            input.Skip();
         }
 
         template <typename T, typename Buffer>
         inline void SkipElements(
             BondDataType /*keyType*/,
             BondDataType /*elementType*/,
-            ProtobufBinaryReader<Buffer>& /*input*/,
-            uint32_t /*size*/)
+            ProtobufBinaryReader<Buffer>& input,
+            uint32_t size)
         {
-            BOOST_ASSERT(false);
+            BOOST_VERIFY(size == 0);
+            input.Skip();
         }
 
         template <typename T, typename Buffer>
         inline void SkipElements(
             BondDataType /*keyType*/,
             const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
-            ProtobufBinaryReader<Buffer>& /*input*/,
-            uint32_t /*size*/)
+            ProtobufBinaryReader<Buffer>& input,
+            uint32_t size)
         {
-            BOOST_ASSERT(false);
+            BOOST_VERIFY(size == 0);
+            input.Skip();
+        }
+
+        template <typename Key, typename T, typename Buffer>
+        inline void SkipElements(
+            const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
+            const value<T, ProtobufBinaryReader<Buffer>&>& element,
+            uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            element.Skip();
+        }
+
+        template <typename T, typename Buffer>
+        inline void SkipElements(const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            element.Skip();
         }
 
     } // namespace detail
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::disable_if_c<is_list_container<X>::value
-                                && std::is_same<typename element_type<X>::type, blob::value_type>::value>::type
+    typename boost::enable_if_c<(is_list_container<X>::value || is_set_container<X>::value)
+                                && is_element_matching<value<T, ProtobufBinaryReader<Buffer>&>, X>::value
+                                && !detail::proto::is_blob_type<X>::value>::type
     inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
+
         do
         {
             typename element_type<X>::type item = make_element(var);
@@ -557,10 +580,11 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename X, typename T, typename Buffer>
-    typename boost::enable_if_c<is_list_container<X>::value
-                                && std::is_same<typename element_type<X>::type, blob::value_type>::value>::type
-    inline DeserializeElements(X& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+    template <typename Protocols, typename X, typename Buffer>
+    typename boost::enable_if_c<is_element_matching<value<blob::value_type, ProtobufBinaryReader<Buffer>&>, X>::value
+                                && detail::proto::is_blob_type<X>::value>::type
+    inline DeserializeElements(
+        X& var, const value<blob::value_type, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
 
@@ -574,7 +598,8 @@ namespace bond
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
-    inline void DeserializeElements(
+    typename boost::enable_if<is_matching<T, X> >::type
+    inline DeserializeElements(
         nullable<X>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
@@ -587,9 +612,9 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename T, typename Buffer>
+    template <typename Protocols, typename Buffer>
     inline void DeserializeElements(
-        nullable<blob::value_type>& var, const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+        nullable<blob::value_type>& var, const value<blob::value_type, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
     {
         BOOST_VERIFY(size == 0);
 
@@ -605,6 +630,13 @@ namespace bond
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
         detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, 0);
+    }
+
+
+    template <typename Protocols, typename T, typename Buffer>
+    inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
+    {
+        input.Read(var);
     }
 
 
@@ -631,15 +663,9 @@ namespace bond
     }
 
 
-    template <typename Protocols, typename T, typename Buffer>
-    inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
-    {
-        input.Read(var);
-    }
-
-
     template <typename Protocols, typename X, typename Key, typename T, typename Buffer>
-    inline void DeserializeMapElements(
+    typename boost::enable_if<is_map_key_matching<value<Key, ProtobufBinaryReader<Buffer>&>, X> >::type
+    inline DeserializeMapElements(
         X& var,
         const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
         const value<T, ProtobufBinaryReader<Buffer>&>& element,
