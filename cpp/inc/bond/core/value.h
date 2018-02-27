@@ -670,7 +670,8 @@ inline DeserializeElements(nullable<X, Allocator, useValue>& var, const T& eleme
     // Wire representation and interface for nullable is the same as for list.
     // However nullable can "contain" at most one element. If there are more
     // elements in the payload we skip them.
-    detail::SkipElements(element, size);
+    using detail::SkipElements;
+    SkipElements(element, size);
 }
 
 
@@ -702,7 +703,8 @@ template <typename Protocols, typename X, typename T>
 typename boost::disable_if<is_element_matching<T, X> >::type
 inline DeserializeElements(X&, const T& element, uint32_t size)
 {
-    detail::SkipElements(element, size);
+    using detail::SkipElements;
+    SkipElements(element, size);
 }
 
 
@@ -734,7 +736,8 @@ inline void SkipContainer(const T& element, Reader& input)
         input.ReadContainerBegin(size, type);
     }
 
-    detail::SkipElements(element, size);
+    using detail::SkipElements;
+    SkipElements(element, size);
 
     input.ReadContainerEnd();
 }
@@ -799,7 +802,8 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
     }
     else
     {
-        detail::SkipElements(type, input, size);
+        using detail::SkipElements;
+        SkipElements(type, input, size);
     }
 
     input.ReadContainerEnd();
@@ -824,7 +828,8 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
         {
             if (type == GetTypeId(element))
             {
-                detail::SkipElements(element, size);
+                using detail::SkipElements;
+                SkipElements(element, size);
             }
             else
             {
@@ -874,7 +879,8 @@ template <typename Protocols, typename X, typename Key, typename T>
 typename boost::disable_if<is_map_key_matching<Key, X> >::type
 inline DeserializeMapElements(X&, const Key& key, const T& element, uint32_t size)
 {
-    detail::SkipElements(key, element, size);
+    using detail::SkipElements;
+    SkipElements(key, element, size);
 }
 
 
@@ -898,7 +904,8 @@ inline void SkipMap(BondDataType keyType, const T& element, Reader& input)
         input.ReadContainerBegin(size, type);
     }
 
-    detail::SkipElements(keyType, element, input, size);
+    using detail::SkipElements;
+    SkipElements(keyType, element, input, size);
 
     input.ReadContainerEnd();
 }
@@ -956,7 +963,8 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
     }
     else
     {
-        detail::SkipElements(type.first, type.second, input, size);
+        using detail::SkipElements;
+        SkipElements(type.first, type.second, input, size);
     }
 
     input.ReadContainerEnd();
@@ -981,7 +989,8 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
         {
             if (type.second == GetTypeId(element))
             {
-                detail::SkipElements(type.first, element, input, size);
+                using detail::SkipElements;
+                SkipElements(type.first, element, input, size);
             }
             else
             {

@@ -257,39 +257,6 @@ namespace bond
             _size -= sizeof(blob::value_type);
         }
 
-        void Skip()
-        {
-            switch (_type)
-            {
-            case WireType::VarInt:
-                {
-                    uint64_t value;
-                    ReadVarInt(value);
-                }
-                break;
-
-            case WireType::Fixed64:
-                _input.Skip(sizeof(uint64_t));
-                Consume(sizeof(uint64_t));
-                break;
-
-            case WireType::LengthDelimited:
-                _input.Skip(_size);
-                Consume(_size);
-                _size = 0;
-                break;
-
-            case WireType::Fixed32:
-                _input.Skip(sizeof(uint32_t));
-                Consume(sizeof(uint32_t));
-                break;
-
-            default:
-                BOOST_ASSERT(false);
-                break;
-            }
-        }
-
         template <typename T>
         void Skip()
         {
@@ -476,6 +443,103 @@ namespace bond
             return false;
         }
 
+        void Skip()
+        {
+            switch (_type)
+            {
+            case WireType::VarInt:
+                {
+                    uint64_t value;
+                    ReadVarInt(value);
+                }
+                break;
+
+            case WireType::Fixed64:
+                _input.Skip(sizeof(uint64_t));
+                Consume(sizeof(uint64_t));
+                break;
+
+            case WireType::LengthDelimited:
+                _input.Skip(_size);
+                Consume(_size);
+                _size = 0;
+                break;
+
+            case WireType::Fixed32:
+                _input.Skip(sizeof(uint32_t));
+                Consume(sizeof(uint32_t));
+                break;
+
+            default:
+                BOOST_ASSERT(false);
+                break;
+            }
+        }
+
+        friend void SkipElements(BondDataType /*type*/, ProtobufBinaryReader& input, uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            input.Skip();
+        }
+
+        friend void SkipElements(
+            BondDataType /*keyType*/,
+            BondDataType /*elementType*/,
+            ProtobufBinaryReader& input,
+            uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            input.Skip();
+        }
+
+        template <typename T>
+        friend void SkipElements(
+            BondDataType /*keyType*/,
+            const value<T, ProtobufBinaryReader&>& /*element*/,
+            ProtobufBinaryReader& input,
+            uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            input.Skip();
+        }
+
+        template <typename Key, typename T>
+        friend void SkipElements(
+            const value<Key, ProtobufBinaryReader&>& /*key*/,
+            const value<T, ProtobufBinaryReader&>& element,
+            uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            element.Skip();
+        }
+
+        template <typename T>
+        friend void SkipElements(const value<T, ProtobufBinaryReader&>& element, uint32_t size)
+        {
+            BOOST_VERIFY(size == 0);
+            element.Skip();
+        }
+
+        template <typename ProtocolsT, typename T, typename X>
+        friend bool ApplyTransform(
+            const To<T, ProtocolsT>& transform, const bonded<X, ProtobufBinaryReader&>& bonded)
+        {
+            using detail::ApplyTransform;
+            return ApplyTransform<ProtocolsT>(
+                To<T, ProtocolsT, detail::proto::RequiredFieldValiadator<T> >{ transform }, bonded);
+        }
+
+        template <typename ProtocolsT, typename T, typename X>
+        friend bool ApplyTransform(
+            const To<T, Protocols<ProtobufBinaryReader> >& transform, const bonded<X>& bonded)
+        {
+            BOOST_STATIC_ASSERT(std::is_same<ProtocolsT, bond::Protocols<ProtobufBinaryReader> >::value);
+            
+            using detail::ApplyTransform;
+            return ApplyTransform<ProtocolsT>(
+                To<T, ProtocolsT, detail::proto::RequiredFieldValiadator<T> >{ transform }, bonded);
+        }
+
 
         Buffer _input;
         uint32_t _size;
@@ -486,80 +550,6 @@ namespace bond
         bool _strict_match;
         detail::SimpleArray<uint32_t> _lengths;
     };
-
-
-    namespace detail
-    {
-        template <typename Protocols, typename T, typename X, typename Buffer>
-        inline bool ApplyTransform(
-            const bond::To<T, Protocols>& transform, const bonded<X, ProtobufBinaryReader<Buffer>&>& bonded)
-        {
-            return ApplyTransform<Protocols>(
-                bond::To<T, Protocols, proto::RequiredFieldValiadator<T> >{ transform }, bonded);
-        }
-
-        template <typename Protocols, typename T, typename X, typename Buffer>
-        inline bool ApplyTransform(
-            const bond::To<T, bond::Protocols<ProtobufBinaryReader<Buffer> > >& transform, const bonded<X>& bonded)
-        {
-            BOOST_STATIC_ASSERT(std::is_same<Protocols, bond::Protocols<ProtobufBinaryReader<Buffer> > >::value);
-
-            return ApplyTransform<Protocols>(
-                bond::To<T, Protocols, proto::RequiredFieldValiadator<T> >{ transform }, bonded);
-        }
-
-    } // namesace detail
-
-
-    namespace detail
-    {
-        template <typename Buffer>
-        inline void SkipElements(BondDataType /*type*/, ProtobufBinaryReader<Buffer>& input, uint32_t size)
-        {
-            BOOST_VERIFY(size == 0);
-            input.Skip();
-        }
-
-        template <typename Buffer>
-        inline void SkipElements(
-            BondDataType /*keyType*/,
-            BondDataType /*elementType*/,
-            ProtobufBinaryReader<Buffer>& input,
-            uint32_t size)
-        {
-            BOOST_VERIFY(size == 0);
-            input.Skip();
-        }
-
-        template <typename T, typename Buffer>
-        inline void SkipElements(
-            BondDataType /*keyType*/,
-            const value<T, ProtobufBinaryReader<Buffer>&>& /*element*/,
-            ProtobufBinaryReader<Buffer>& input,
-            uint32_t size)
-        {
-            BOOST_VERIFY(size == 0);
-            input.Skip();
-        }
-
-        template <typename Key, typename T, typename Buffer>
-        inline void SkipElements(
-            const value<Key, ProtobufBinaryReader<Buffer>&>& /*key*/,
-            const value<T, ProtobufBinaryReader<Buffer>&>& element,
-            uint32_t size)
-        {
-            BOOST_VERIFY(size == 0);
-            element.Skip();
-        }
-
-        template <typename T, typename Buffer>
-        inline void SkipElements(const value<T, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
-        {
-            BOOST_VERIFY(size == 0);
-            element.Skip();
-        }
-
-    } // namespace detail
 
 
     template <typename Protocols, typename X, typename T, typename Buffer>
@@ -646,7 +636,8 @@ namespace bond
         case BT_SET:
         case BT_MAP:
         case BT_STRUCT:
-            detail::SkipElements(element, 0);
+            using detail::SkipElements;
+            SkipElements(element, 0);
             break;
 
         default:
@@ -712,7 +703,8 @@ namespace bond
         case BT_SET:
         case BT_MAP:
         case BT_STRUCT:
-            detail::SkipElements(keyType, element, input, 0);
+            using detail::SkipElements;
+            SkipElements(keyType, element, input, 0);
             break;
 
         default:
@@ -734,7 +726,8 @@ namespace bond
         }
         else
         {
-            detail::SkipElements(keyType, elementType, input, 0);
+            using detail::SkipElements;
+            SkipElements(keyType, elementType, input, 0);
         }
     }
 
