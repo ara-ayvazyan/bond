@@ -73,13 +73,25 @@ implements_varint_read
 
 
 template <typename Buffer, typename T> struct
+implements_varint_read<Buffer, T, typename boost::enable_if<bond::check_method<void (Buffer::*)(T&), &Buffer::ReadVariableUnsigned> >::type>
+    : std::true_type
+{
+    using result_type = void;
+};
+
+
+template <typename Buffer, typename T> struct
 implements_varint_read<Buffer, T, typename boost::enable_if<bond::check_method<uint8_t (Buffer::*)(T&), &Buffer::ReadVariableUnsigned> >::type>
-    : std::true_type {};
+    : std::true_type
+{
+    using result_type = uint8_t;
+};
 
 
 template<typename Buffer, typename T>
 inline
-typename boost::enable_if<implements_varint_read<Buffer, T>, uint8_t>::type
+typename boost::enable_if<implements_varint_read<Buffer, T>,
+    typename implements_varint_read<Buffer, T>::result_type>::type
 ReadVariableUnsigned(Buffer& input, T& value)
 {
     BOOST_STATIC_ASSERT(std::is_unsigned<T>::value);
