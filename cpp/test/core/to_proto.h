@@ -16,10 +16,11 @@ namespace proto
     class ToProto : public SerializingTransform
     {
     public:
-        explicit ToProto(google::protobuf::Message& msg)
+        explicit ToProto(google::protobuf::Message& msg, bool allow_scalar_to_container = false)
             : _message{ msg },
               _reflection{ *_message.GetReflection() },
-              _descriptor{ *_message.GetDescriptor() }
+              _descriptor{ *_message.GetDescriptor() },
+              _allow_scalar_to_container{ allow_scalar_to_container }
         {}
 
         void Begin(const Metadata&) const
@@ -42,7 +43,7 @@ namespace proto
         typename boost::disable_if_c<is_container<T>::value && !is_blob_type<T>::value, bool>::type
         Field(uint16_t id, const Metadata& /*metadata*/, const T& value) const
         {
-            SetValue(GetField(id), value);
+            SetOrAddValue(GetField(id), value);
             return false;
         }
 
@@ -111,6 +112,20 @@ namespace proto
             auto field = _descriptor.FindFieldByNumber(id);
             BOOST_ASSERT(field);
             return *field;
+        }
+
+        template <typename T>
+        void SetOrAddValue(const google::protobuf::FieldDescriptor& field, const T& value) const
+        {
+            if (_allow_scalar_to_container && field.is_repeated())
+            {
+                _reflection.ClearField(&_message, &field);
+                AddValue(field, value);
+            }
+            else
+            {
+                SetValue(field, value);
+            }
         }
 
         template <typename T1, typename T2>
@@ -309,6 +324,7 @@ namespace proto
         google::protobuf::Message& _message;
         const google::protobuf::Reflection& _reflection;
         const google::protobuf::Descriptor& _descriptor;
+        bool _allow_scalar_to_container;
     };
 
 } // namespace proto
