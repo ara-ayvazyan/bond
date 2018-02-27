@@ -520,7 +520,7 @@ namespace bond
             input.Skip();
         }
 
-        template <typename T, typename Buffer>
+        template <typename Buffer>
         inline void SkipElements(
             BondDataType /*keyType*/,
             BondDataType /*elementType*/,
@@ -597,6 +597,15 @@ namespace bond
     }
 
 
+    template <typename Protocols, typename Buffer>
+    inline void DeserializeElements(
+        blob& var, const value<blob::value_type, ProtobufBinaryReader<Buffer>&>& element, uint32_t size)
+    {
+        BOOST_VERIFY(size == 0);
+        element.GetInput().Read(var);
+    }
+
+
     template <typename Protocols, typename X, typename T, typename Buffer>
     typename boost::enable_if<is_matching<T, X> >::type
     inline DeserializeElements(
@@ -629,14 +638,21 @@ namespace bond
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeContainer(X& var, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        detail::MatchingTypeContainer<Protocols>(var, GetTypeId(element), input, 0);
-    }
+        auto type = GetTypeId(element);
 
+        switch (type)
+        {
+        case BT_LIST:
+        case BT_SET:
+        case BT_MAP:
+        case BT_STRUCT:
+            detail::SkipElements(element, 0);
+            break;
 
-    template <typename Protocols, typename T, typename Buffer>
-    inline void DeserializeContainer(blob& var, const T& /*element*/, ProtobufBinaryReader<Buffer>& input)
-    {
-        input.Read(var);
+        default:
+            detail::MatchingTypeContainer<Protocols>(var, type, input, 0);
+            break;
+        }
     }
 
 
@@ -688,7 +704,21 @@ namespace bond
     typename boost::enable_if<is_basic_container<X> >::type
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        detail::MatchingMapByElement<Protocols>(var, keyType, GetTypeId(element), input, 0);
+        auto elementType = GetTypeId(element);
+
+        switch (elementType)
+        {
+        case BT_LIST:
+        case BT_SET:
+        case BT_MAP:
+        case BT_STRUCT:
+            detail::SkipElements(keyType, element, input, 0);
+            break;
+
+        default:
+            detail::MatchingMapByElement<Protocols>(var, keyType, elementType, input, 0);
+            break;
+        }
     }
 
 
@@ -696,7 +726,16 @@ namespace bond
     typename boost::enable_if<is_nested_container<X> >::type
     inline DeserializeMap(X& var, BondDataType keyType, const T& element, ProtobufBinaryReader<Buffer>& input)
     {
-        detail::MapByKey<Protocols>(var, keyType, element, input, 0);
+        auto elementType = GetTypeId(element);
+
+        if (elementType == get_type_id<typename element_type<X>::type::second_type>::value)
+        {
+            detail::MapByKey<Protocols>(var, keyType, element, input, 0);
+        }
+        else
+        {
+            detail::SkipElements(keyType, elementType, input, 0);
+        }
     }
 
 

@@ -937,6 +937,42 @@ BOOST_AUTO_TEST_CASE(ComplexStructTests)
     CheckBinaryFormat<unittest::proto::ComplexStruct, unittest::ComplexStruct>();
 }
 
+BOOST_AUTO_TEST_CASE(VarTypeMatchingTests)
+{
+    auto bond_struct = InitRandom<unittest::MatchingVarTypes>();
+
+    auto bond_struct_expected = GetBonded<
+        bond::CompactBinaryReader<bond::InputBuffer>,
+        bond::CompactBinaryWriter<bond::OutputBuffer>,
+        unittest::NonMatchingVarTypes>(bond_struct).Deserialize();
+
+    unittest::proto::MatchingVarTypes proto_struct;
+    bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
+
+    auto payload = proto_struct.SerializeAsString();
+
+    bond::InputBuffer input{ payload.data(), uint32_t(payload.size()) };
+
+    // Compile-time schema
+    {
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input };
+        unittest::NonMatchingVarTypes bond_struct_no_match;
+        bond::Apply(
+            bond::To<unittest::NonMatchingVarTypes>{ bond_struct_no_match },
+            bond::bonded<unittest::MatchingVarTypes, decltype(reader)&>{ reader });
+        BOOST_CHECK((bond_struct_no_match == bond_struct_expected));
+    }
+    // Runtimetime schema
+    {
+        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input };
+        unittest::NonMatchingVarTypes bond_struct_no_match;
+        bond::Apply(
+            bond::To<unittest::NonMatchingVarTypes>{ bond_struct_no_match },
+            bond::bonded<void, decltype(reader)&>{ reader, bond::GetRuntimeSchema<unittest::MatchingVarTypes>() });
+        BOOST_CHECK((bond_struct_no_match == bond_struct_expected));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 bool init_unit_test()
