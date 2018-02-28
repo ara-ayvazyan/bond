@@ -56,14 +56,14 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = t
 template <typename Proto, typename Bond>
 void CheckBinaryFormat(bool strict = true)
 {
-    CheckBinaryFormat<Proto>({ Bond{} }, strict);
+    CheckBinaryFormat<Proto>(std::initializer_list<Bond>{ Bond{} }, strict);
 
     auto s1 = InitRandom<Bond>();
-    CheckBinaryFormat<Proto>({ s1 }, strict);
+    CheckBinaryFormat<Proto>(std::initializer_list<Bond>{ s1 }, strict);
 
     auto s2 = InitRandom<Bond>();
     auto s3 = InitRandom<Bond>();
-    CheckBinaryFormat<Proto>({ s1, s2, s3, s2, s1, s3 }, strict);
+    CheckBinaryFormat<Proto>(std::initializer_list<Bond>{ s1, s2, s3, s2, s1, s3 }, strict);
 }
 
 BOOST_AUTO_TEST_CASE(IntegerTests)
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(BlobContainerTests, T, blob_types)
 
     unittest::BoxWrongPackingWrongEncoding<std::vector<T> > box;
     box.value.resize(2);
-    CheckBinaryFormat<unittest::proto::BlobContainer>({ box });
+    CheckBinaryFormat<unittest::proto::BlobContainer>(std::initializer_list<decltype(box)>{ box });
 }
 
 BOOST_AUTO_TEST_CASE(StructContainerTests)

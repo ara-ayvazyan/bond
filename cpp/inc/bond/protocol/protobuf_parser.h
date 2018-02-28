@@ -15,7 +15,14 @@ namespace bond
     {
     namespace proto
     {
-        template <BondDataType T>
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+        // Using BondDataType directly in non-trivial boolean template checks fails on VC12.
+        using BT = std::underlying_type<BondDataType>::type;
+#else
+        using BT = BondDataType;
+#endif
+
+        template <BT T>
         typename boost::enable_if_c<(T == BT_BOOL), bool>::type
         inline MatchWireType(WireType type, Encoding encoding, bool /*strict*/ = true)
         {
@@ -23,7 +30,7 @@ namespace bond
             return type == WireType::VarInt;
         }
 
-        template <BondDataType T>
+        template <BT T>
         typename boost::enable_if_c<(T == BT_UINT8 || T == BT_INT8 || T == BT_UINT16 || T == BT_INT16), bool>::type
         inline MatchWireType(WireType type, Encoding encoding, bool strict)
         {
@@ -47,7 +54,7 @@ namespace bond
             }
         }
 
-        template <BondDataType T>
+        template <BT T>
         typename boost::enable_if_c<(T == BT_UINT32 || T == BT_INT32 || T == BT_UINT64 || T == BT_INT64), bool>::type
         inline MatchWireType(WireType type, Encoding encoding, bool strict)
         {
@@ -71,7 +78,7 @@ namespace bond
             }
         }
 
-        template <BondDataType T>
+        template <BT T>
         typename boost::enable_if_c<(T == BT_FLOAT || T == BT_DOUBLE), bool>::type
         inline MatchWireType(WireType type, Encoding encoding, bool strict)
         {
@@ -87,7 +94,7 @@ namespace bond
             }
         }
 
-        template <BondDataType T>
+        template <BT T>
         typename boost::enable_if_c<(T == BT_STRING || T == BT_WSTRING || T == BT_STRUCT || T == BT_MAP), bool>::type
         inline MatchWireType(WireType type, Encoding encoding = Unavailable<Encoding>::value, bool /*strict*/ = true)
         {
@@ -95,7 +102,7 @@ namespace bond
             return type == WireType::LengthDelimited;
         }
 
-        template <BondDataType T>
+        template <BT T>
         typename boost::enable_if_c<(T == BT_LIST || T == BT_SET), bool>::type
         inline MatchWireType(WireType /*type*/, Encoding /*encoding*/, bool /*strict*/)
         {
@@ -103,7 +110,7 @@ namespace bond
             return false;
         }
 
-        template <BondDataType T>
+        template <BT T>
         inline bool MatchWireType(WireType type, Encoding encoding, Packing packing, bool strict)
         {
             if (strict)
