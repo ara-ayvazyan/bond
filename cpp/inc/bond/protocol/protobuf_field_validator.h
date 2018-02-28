@@ -136,6 +136,9 @@ namespace proto
     };
 
 
+    template <typename U>
+    using always_one = std::integral_constant<uint16_t, 1>;
+
     template <typename T>
     class RequiredFieldValiadator
     {
@@ -190,9 +193,6 @@ namespace proto
         }
 
     private:
-        template <typename U>
-        using always_one = std::integral_constant<uint16_t, 1>;
-
         template <typename U = T>
         typename boost::enable_if<no_required_fields<U> >::type
         Init()
