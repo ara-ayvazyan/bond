@@ -161,6 +161,15 @@ namespace proto
             Apply(ToProto{ *msg }, value);
         }
 
+        template <typename T, typename Reader>
+        typename boost::disable_if<is_basic_type<T> >::type
+        AddValue(const google::protobuf::FieldDescriptor& field, const value<T, Reader>& value) const
+        {
+            auto msg = _reflection.AddMessage(&_message, &field);
+            BOOST_ASSERT(msg);
+            Apply(ToProto{ *msg }, value);
+        }
+
         template <typename T>
         typename boost::enable_if<std::is_enum<T> >::type
         SetValue(const google::protobuf::FieldDescriptor& field, T value) const
