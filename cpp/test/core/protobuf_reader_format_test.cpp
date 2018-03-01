@@ -1,8 +1,6 @@
 #include "precompiled.h"
 #include "protobuf_reader_test_utils.h"
 #include "append_to.h"
-
-#include "protobuf_writer_apply.h"
 #include "protobuf_writer_reflection.h"
 
 #include <boost/test/unit_test.hpp>

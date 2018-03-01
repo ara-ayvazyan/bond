@@ -1,12 +1,33 @@
 #include "precompiled.h"
 #include "protobuf_reader_test_utils.h"
-#include "protobuf_writer_apply.h"
 #include "protobuf_writer_reflection.h"
 
+#include <boost/mpl/map.hpp>
 #include <boost/test/unit_test.hpp>
 
 
 BOOST_AUTO_TEST_SUITE(ProtobufReaderUnsupportedTypesTests)
+
+using proto_box_mapping = boost::mpl::map<
+    boost::mpl::pair<uint8_t, google::protobuf::UInt32Value>,
+    boost::mpl::pair<uint16_t, google::protobuf::UInt32Value>,
+    boost::mpl::pair<uint32_t, google::protobuf::UInt32Value>,
+    boost::mpl::pair<uint64_t, google::protobuf::UInt64Value>,
+    boost::mpl::pair<int8_t, google::protobuf::Int32Value>,
+    boost::mpl::pair<int16_t, google::protobuf::Int32Value>,
+    boost::mpl::pair<int32_t, google::protobuf::Int32Value>,
+    boost::mpl::pair<int64_t, google::protobuf::Int64Value>,
+    boost::mpl::pair<unittest::Enum, google::protobuf::Int32Value>,
+    boost::mpl::pair<bool, google::protobuf::BoolValue>,
+    boost::mpl::pair<float, google::protobuf::FloatValue>,
+    boost::mpl::pair<double, google::protobuf::DoubleValue>,
+    boost::mpl::pair<bond::blob, google::protobuf::BytesValue>,
+    boost::mpl::pair<std::string, google::protobuf::StringValue>,
+    boost::mpl::pair<std::wstring, google::protobuf::StringValue>,
+    boost::mpl::pair<unittest::IntegersContainer, google::protobuf::BytesValue> >;
+
+template <typename T>
+using proto_box = typename boost::mpl::at<proto_box_mapping, T>::type;
 
 template <typename Bond>
 void DeserializeCheckThrow(

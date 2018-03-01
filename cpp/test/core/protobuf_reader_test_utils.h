@@ -10,7 +10,6 @@
 #include <bond/protocol/protobuf_binary_reader.h>
 
 #include <boost/mpl/joint_view.hpp>
-#include <boost/mpl/map.hpp>
 
 
 namespace bond
@@ -65,24 +64,3 @@ using signed_integer_types = boost::mpl::list<int16_t, int32_t, int64_t, unittes
 using integer_types = expand<unsigned_integer_types, int16_t, int32_t, int64_t, unittest::Enum>;
 using basic_types = expand<integer_types, bool, float, double, std::string, std::wstring>;
 using scalar_types = expand<basic_types, bond::blob, std::vector<int8_t>, bond::nullable<int8_t> >;
-
-using proto_box_mapping = boost::mpl::map<
-    boost::mpl::pair<uint8_t, google::protobuf::UInt32Value>,
-    boost::mpl::pair<uint16_t, google::protobuf::UInt32Value>,
-    boost::mpl::pair<uint32_t, google::protobuf::UInt32Value>,
-    boost::mpl::pair<uint64_t, google::protobuf::UInt64Value>,
-    boost::mpl::pair<int8_t, google::protobuf::Int32Value>,
-    boost::mpl::pair<int16_t, google::protobuf::Int32Value>,
-    boost::mpl::pair<int32_t, google::protobuf::Int32Value>,
-    boost::mpl::pair<int64_t, google::protobuf::Int64Value>,
-    boost::mpl::pair<unittest::Enum, google::protobuf::Int32Value>,
-    boost::mpl::pair<bool, google::protobuf::BoolValue>,
-    boost::mpl::pair<float, google::protobuf::FloatValue>,
-    boost::mpl::pair<double, google::protobuf::DoubleValue>,
-    boost::mpl::pair<bond::blob, google::protobuf::BytesValue>,
-    boost::mpl::pair<std::string, google::protobuf::StringValue>,
-    boost::mpl::pair<std::wstring, google::protobuf::StringValue>,
-    boost::mpl::pair<unittest::IntegersContainer, google::protobuf::BytesValue> >;
-
-template <typename T>
-using proto_box = typename boost::mpl::at<proto_box_mapping, T>::type;
