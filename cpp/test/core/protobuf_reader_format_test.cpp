@@ -5,7 +5,9 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <algorithm>
 #include <initializer_list>
+#include <random>
 
 
 BOOST_AUTO_TEST_SUITE(ProtobufReaderFormatTests)
@@ -30,7 +32,7 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = t
 
     // merged payload
     {
-        bond::InputBuffer input(merged_payload.data(), static_cast<uint32_t>(merged_payload.length()));
+        bond::InputBuffer input{ merged_payload.data(), static_cast<uint32_t>(merged_payload.length()) };
         bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
 
         // Compile-time schema
@@ -41,7 +43,7 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = t
     // merged object
     {
         
-        bond::InputBuffer input(payload.data(), static_cast<uint32_t>(payload.length()));
+        bond::InputBuffer input{ payload.data(), static_cast<uint32_t>(payload.length()) };
         bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
 
         // Compile-time schema
@@ -225,6 +227,58 @@ BOOST_AUTO_TEST_CASE(StructMapValueTests)
 BOOST_AUTO_TEST_CASE(ComplexStructTests)
 {
     CheckBinaryFormat<unittest::proto::ComplexStruct, unittest::ComplexStruct>();
+}
+
+BOOST_AUTO_TEST_CASE(FieldOrderingTests)
+{
+    using Bond = unittest::Integers;
+    using Proto = unittest::proto::Integers;
+
+    auto bond_struct = InitRandom<Bond>();
+    Proto proto_struct;
+    bond::Apply(bond::detail::proto::ToProto{ proto_struct }, bond_struct);
+
+    std::array<int, boost::mpl::size<Bond::Schema::fields>::value> field_ids;
+    {
+        auto desc = proto_struct.GetDescriptor();
+        for (int i = 0; i < desc->field_count(); ++i)
+        {
+            field_ids[i] = desc->field(i)->number();
+        }
+    }
+
+    {
+        std::random_device rd;
+        std::shuffle(field_ids.begin(), field_ids.end(), std::mt19937{ rd() });
+    }
+
+    google::protobuf::string payload;
+
+    for (int id : field_ids)
+    {
+        auto proto_struct_field = proto_struct;
+        auto desc = proto_struct_field.GetDescriptor();
+        auto refl = proto_struct_field.GetReflection();
+
+        for (int i = 0; i < desc->field_count(); ++i)
+        {
+            auto field = desc->field(i);
+            if (field->number() != id)
+            {
+                refl->ClearField(&proto_struct_field, field);
+            }
+        }
+
+        payload += proto_struct_field.SerializeAsString();
+    }
+
+    bond::InputBuffer input{ payload.data(), static_cast<uint32_t>(payload.length()) };
+    bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input };
+
+    // Compile-time schema
+    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
+    // Runtime schema
+    BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
