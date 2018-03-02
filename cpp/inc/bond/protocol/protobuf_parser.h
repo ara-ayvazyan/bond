@@ -5,6 +5,7 @@
 
 #include <bond/core/config.h>
 
+#include <bond/core/detail/parser_utils.h>
 #include <bond/core/bond_types.h>
 #include <bond/core/value.h>
 
@@ -209,21 +210,6 @@ namespace bond
         }
 
 
-        template <typename FieldT, typename Transform, typename T>
-        typename boost::enable_if<is_fast_path_field<FieldT, Transform>, bool>::type
-        inline Field(const Transform& transform, const T& value)
-        {
-            return transform.Field(FieldT{}, value);
-        }
-
-        template <typename FieldT, typename Transform, typename T>
-        typename boost::disable_if<is_fast_path_field<FieldT, Transform>, bool>::type
-        inline Field(const Transform& transform, const T& value)
-        {
-            return transform.Field(FieldT::id, FieldT::metadata, value);
-        }
-
-
         template <typename T, typename Enable = void> struct
         is_nested_blob_type
             : std::false_type {};
@@ -378,7 +364,7 @@ namespace bond
 
             if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type, encoding, _strict_match))
             {
-                detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
+                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -392,7 +378,7 @@ namespace bond
         {
             if (detail::proto::MatchWireType<BT_STRUCT>(type))
             {
-                detail::proto::Field<T>(transform, bonded<typename T::field_type, Input&>{ _input });
+                detail::Field(T{}, transform, bonded<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -442,7 +428,7 @@ namespace bond
 
             if (matched)
             {
-                detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
+                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -466,7 +452,7 @@ namespace bond
                 _input.SetEncoding(detail::proto::ReadValueEncoding(
                     get_type_id<typename element_type<typename T::field_type>::type::second_type>::value, &T::metadata));
 
-                detail::proto::Field<T>(transform, value<typename T::field_type, Input&>{ _input });
+                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
 
                 return true;
             }
