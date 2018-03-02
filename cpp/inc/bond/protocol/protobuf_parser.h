@@ -267,6 +267,8 @@ namespace bond
 
                 if (detail::proto::MatchWireType<get_type_id<T>::value>(_type, _encoding, _strict_match))
                 {
+                    value.GetInput().SetEncoding(_encoding);
+
                     _transform.Field(id, metadata, value);
                     return true;
                 }
@@ -322,7 +324,7 @@ namespace bond
             {
                 if (Head::id == id)
                 {
-                    if (!Field<Head>(transform, type))
+                    if (!Field(Head{}, transform, type))
                     {
                         transform.UnknownField(Head::id, value<void, Input>{ _input, BT_UNAVAILABLE });
                     }
@@ -356,15 +358,15 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_basic_type<typename T::field_type>, bool>::type
-        Field(const Transform& transform, WireType type)
+        Field(const T& field, const Transform& transform, WireType type)
         {
             Encoding encoding = detail::proto::ReadEncoding(get_type_id<typename T::field_type>::value, &T::metadata);
 
-            _input.SetEncoding(encoding);
-
             if (detail::proto::MatchWireType<get_type_id<typename T::field_type>::value>(type, encoding, _strict_match))
             {
-                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
+                _input.SetEncoding(encoding);
+
+                detail::Field(field, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -374,11 +376,11 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_bond_type<typename T::field_type>, bool>::type
-        Field(const Transform& transform, WireType type)
+        Field(const T& field, const Transform& transform, WireType type)
         {
             if (detail::proto::MatchWireType<BT_STRUCT>(type))
             {
-                detail::Field(T{}, transform, bonded<typename T::field_type, Input&>{ _input });
+                detail::Field(field, transform, bonded<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -389,11 +391,11 @@ namespace bond
         template <typename T, typename Transform>
         typename boost::enable_if_c<detail::proto::is_blob_type<typename T::field_type>::value
                                     || detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
-        Field(const Transform& transform, WireType type)
+        Field(const T& field, const Transform& transform, WireType type)
         {
             if (type == WireType::LengthDelimited)
             {
-                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
+                detail::Field(field, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -406,7 +408,7 @@ namespace bond
                                         || is_set_container<typename T::field_type>::value)
                                     && !detail::proto::is_blob_type<typename T::field_type>::value
                                     && !detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
-        Field(const Transform& transform, WireType type)
+        Field(const T& field, const Transform& transform, WireType type)
         {
             using element = typename element_type<typename T::field_type>::type;
 
@@ -423,11 +425,11 @@ namespace bond
 
             Encoding encoding = detail::proto::ReadEncoding(get_type_id<element>::value, &T::metadata);
 
-            _input.SetEncoding(encoding);
-
             if (detail::proto::MatchWireType<get_type_id<element>::value>(type, encoding, packing, _strict_match))
             {
-                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
+                _input.SetEncoding(encoding);
+
+                detail::Field(field, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -437,7 +439,7 @@ namespace bond
 
         template <typename T, typename Transform>
         typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
-        Field(const Transform& transform, WireType type)
+        Field(const T& field, const Transform& transform, WireType type)
         {
             BOOST_STATIC_ASSERT(!std::is_floating_point<typename T::field_type::key_type>::value);
 
@@ -451,8 +453,7 @@ namespace bond
                 _input.SetEncoding(detail::proto::ReadValueEncoding(
                     get_type_id<typename element_type<typename T::field_type>::type::second_type>::value, &T::metadata));
 
-                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
-
+                detail::Field(field, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
             }
 
@@ -525,9 +526,12 @@ namespace bond
 
                             Encoding encoding = detail::proto::ReadEncoding(field->type.element->id, &field->metadata);
 
-                            _input.SetEncoding(encoding);
-
                             matched = detail::proto::MatchWireType(field->type.element->id, type, encoding, packing, _strict_match);
+
+                            if (matched)
+                            {
+                                _input.SetEncoding(encoding);
+                            }
                         }
 
                         if (matched)
@@ -538,15 +542,15 @@ namespace bond
                     }
                     else if (field->type.id == BT_MAP)
                     {
+                        if (field->type.element->id == BT_SET
+                            || field->type.element->id == BT_MAP
+                            || (field->type.element->id == BT_LIST && field->type.element->element->id != BT_INT8)) // nested blob
+                        {
+                            detail::proto::NotSupportedException("Container nesting");
+                        }
+
                         if (detail::proto::MatchWireType<BT_MAP>(type))
                         {
-                            if (field->type.element->id == BT_SET
-                                || field->type.element->id == BT_MAP
-                                || (field->type.element->id == BT_LIST && field->type.element->element->id != BT_INT8)) // nested blob
-                            {
-                                detail::proto::NotSupportedException("Container nesting");
-                            }
-
                             BOOST_ASSERT(field->type.key.hasvalue());
                             _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
 
@@ -560,8 +564,6 @@ namespace bond
                     else
                     {
                         Encoding encoding = detail::proto::ReadEncoding(field->type.id, &field->metadata);
-
-                        _input.SetEncoding(encoding);
 
                         if (detail::BasicTypeField(
                                 id,
