@@ -387,46 +387,45 @@ namespace bond
 
 
         template <typename T, typename Transform>
-        typename boost::enable_if_c<is_list_container<typename T::field_type>::value
-                                    || is_set_container<typename T::field_type>::value, bool>::type
+        typename boost::enable_if_c<detail::proto::is_blob_type<typename T::field_type>::value
+                                    || detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
         Field(const Transform& transform, WireType type)
         {
-            using is_blob = std::integral_constant<bool,
+            if (type == WireType::LengthDelimited)
+            {
+                detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
+                return true;
+            }
+
+            return false;
+        }
+
+
+        template <typename T, typename Transform>
+        typename boost::enable_if_c<(is_list_container<typename T::field_type>::value
+                                        || is_set_container<typename T::field_type>::value)
+                                    && !detail::proto::is_blob_type<typename T::field_type>::value
+                                    && !detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
+        Field(const Transform& transform, WireType type)
+        {
+            using element = typename element_type<typename T::field_type>::type;
+
+            BOOST_STATIC_ASSERT(
                 detail::proto::is_blob_type<typename T::field_type>::value
-                || detail::proto::is_nested_blob_type<typename T::field_type>::value>;
+                || detail::proto::is_nested_blob_type<typename T::field_type>::value
+                || (get_type_id<element>::value != BT_LIST
+                    && get_type_id<element>::value != BT_SET
+                    && get_type_id<element>::value != BT_MAP));
 
-            bool matched;
+            Packing packing = _strict_match
+                ? detail::proto::ReadPacking(get_type_id<element>::value, &T::metadata)
+                : detail::proto::Unavailable<Packing>::value;
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4127) // C4127: conditional expression is constant
-#endif
-            if (is_blob::value)
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-            {
-                matched = (type == WireType::LengthDelimited);
-            }
-            else
-            {
-                using element = typename element_type<typename T::field_type>::type;
+            Encoding encoding = detail::proto::ReadEncoding(get_type_id<element>::value, &T::metadata);
 
-                BOOST_STATIC_ASSERT(is_blob::value
-                    || (get_type_id<element>::value != BT_LIST && get_type_id<element>::value != BT_SET && get_type_id<element>::value != BT_MAP));
+            _input.SetEncoding(encoding);
 
-                Packing packing = _strict_match
-                    ? detail::proto::ReadPacking(get_type_id<element>::value, &T::metadata)
-                    : detail::proto::Unavailable<Packing>::value;
-
-                Encoding encoding = detail::proto::ReadEncoding(get_type_id<element>::value, &T::metadata);
-
-                _input.SetEncoding(encoding);
-
-                matched = detail::proto::MatchWireType<get_type_id<element>::value>(type, encoding, packing, _strict_match);
-            }
-
-            if (matched)
+            if (detail::proto::MatchWireType<get_type_id<element>::value>(type, encoding, packing, _strict_match))
             {
                 detail::Field(T{}, transform, value<typename T::field_type, Input&>{ _input });
                 return true;
