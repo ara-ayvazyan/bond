@@ -324,7 +324,11 @@ namespace bond
             {
                 if (Head::id == id)
                 {
-                    if (!Field(Head{}, transform, type))
+                    if (MatchWireType<Head>(type))
+                    {
+                        detail::Field(Head{}, transform, _input);
+                    }
+                    else
                     {
                         transform.UnknownField(Head::id, value<void, Input>{ _input, BT_UNAVAILABLE });
                     }
@@ -371,40 +375,12 @@ namespace bond
             return false;
         }
 
-        template <typename T, typename Transform>
-        typename boost::enable_if<is_basic_type<typename T::field_type>, bool>::type
-        Field(const T& field, const Transform& transform, WireType type)
-        {
-            if (MatchWireType<T>(type))
-            {
-                detail::Field(field, transform, _input);
-                return true;
-            }
-
-            return false;
-        }
-
-
         template <typename T>
         typename boost::enable_if<is_bond_type<typename T::field_type>, bool>::type
         MatchWireType(WireType type)
         {
             return detail::proto::MatchWireType<BT_STRUCT>(type);
         }
-
-        template <typename T, typename Transform>
-        typename boost::enable_if<is_bond_type<typename T::field_type>, bool>::type
-        Field(const T& field, const Transform& transform, WireType type)
-        {
-            if (MatchWireType<T>(type))
-            {
-                detail::Field(field, transform, _input);
-                return true;
-            }
-
-            return false;
-        }
-
 
         template <typename T>
         typename boost::enable_if_c<detail::proto::is_blob_type<typename T::field_type>::value
@@ -413,21 +389,6 @@ namespace bond
         {
             return type == WireType::LengthDelimited;
         }
-
-        template <typename T, typename Transform>
-        typename boost::enable_if_c<detail::proto::is_blob_type<typename T::field_type>::value
-                                    || detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
-        Field(const T& field, const Transform& transform, WireType type)
-        {
-            if (MatchWireType<T>(type))
-            {
-                detail::Field(field, transform, _input);
-                return true;
-            }
-
-            return false;
-        }
-
 
         template <typename T>
         typename boost::enable_if_c<(is_list_container<typename T::field_type>::value
@@ -460,23 +421,6 @@ namespace bond
             return false;
         }
 
-        template <typename T, typename Transform>
-        typename boost::enable_if_c<(is_list_container<typename T::field_type>::value
-                                        || is_set_container<typename T::field_type>::value)
-                                    && !detail::proto::is_blob_type<typename T::field_type>::value
-                                    && !detail::proto::is_nested_blob_type<typename T::field_type>::value, bool>::type
-        Field(const T& field, const Transform& transform, WireType type)
-        {
-            if (MatchWireType<T>(type))
-            {
-                detail::Field(field, transform, _input);
-                return true;
-            }
-
-            return false;
-        }
-
-
         template <typename T>
         typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
         MatchWireType(WireType type)
@@ -492,19 +436,6 @@ namespace bond
                     get_type_id<typename element_type<typename T::field_type>::type::first_type>::value, &T::metadata));
                 _input.SetEncoding(detail::proto::ReadValueEncoding(
                     get_type_id<typename element_type<typename T::field_type>::type::second_type>::value, &T::metadata));
-                return true;
-            }
-
-            return false;
-        }
-
-        template <typename T, typename Transform>
-        typename boost::enable_if<is_map_container<typename T::field_type>, bool>::type
-        Field(const T& field, const Transform& transform, WireType type)
-        {
-            if (MatchWireType<T>(type))
-            {
-                detail::Field(field, transform, _input);
                 return true;
             }
 
