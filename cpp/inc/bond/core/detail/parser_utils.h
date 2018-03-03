@@ -47,10 +47,13 @@ namespace detail
 
 
     template <typename T, typename X>
-    typename boost::disable_if<is_reader<X>, X&&>::type
-    inline GetFieldValue(X&& value)
+    typename boost::disable_if<is_reader<X>,
+        typename std::conditional<std::is_const<X>::value,
+            const typename T::value_type&,
+            typename T::value_type&>::type>::type
+    inline GetFieldValue(X& value)
     {
-        return std::forward<X>(value);
+        return T::GetVariable(value);
     }
 
 
