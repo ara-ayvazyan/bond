@@ -55,8 +55,9 @@ namespace detail
 
 
     template <typename T, typename Transform, typename X>
-    typename boost::enable_if_c<is_fast_path_field<T, Transform>::value
-                                || is_fast_object_path_field<Transform>::value, bool>::type
+    typename boost::enable_if_c<(is_reader<X>::value
+                                ? is_fast_path_field<T, Transform>::value
+                                : is_fast_object_path_field<Transform>::value), bool>::type
     inline Field(const T& field, const Transform& transform, X&& value)
     {
         return transform.Field(field, GetFieldValue<T>(std::forward<X>(value)));
@@ -64,8 +65,9 @@ namespace detail
 
 
     template <typename T, typename Transform, typename X>
-    typename boost::disable_if_c<is_fast_path_field<T, Transform>::value
-                                || is_fast_object_path_field<Transform>::value, bool>::type
+    typename boost::disable_if_c<(is_reader<X>::value
+                                ? is_fast_path_field<T, Transform>::value
+                                : is_fast_object_path_field<Transform>::value), bool>::type
     inline Field(const T&, const Transform& transform, X&& value)
     {
         return transform.Field(T::id, T::metadata, GetFieldValue<T>(std::forward<X>(value)));
