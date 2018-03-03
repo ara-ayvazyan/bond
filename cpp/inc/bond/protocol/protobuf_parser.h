@@ -474,83 +474,26 @@ namespace bond
                         [](const FieldDef& f, uint16_t id) { return f.id < id; });
                 }
 
-                if (const FieldDef* field = (it != fields.end() && it->id == id ? &*it : nullptr))
+                if (const FieldDef* fieldDef = (it != fields.end() && it->id == id ? &*it : nullptr))
                 {
-                    if (field->type.id == BT_STRUCT)
+                    const auto& field = fieldDef->type;
+
+                    if (field.id == BT_STRUCT || field.id == BT_LIST || field.id == BT_SET || field.id == BT_MAP)
                     {
-                        if (detail::proto::MatchWireType<BT_STRUCT>(type))
+                        if (MatchWireType(*fieldDef, type))
                         {
-                            transform.Field(id, field->metadata, bonded<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                            continue;
-                        }
-                    }
-                    else if (field->type.id == BT_LIST || field->type.id == BT_SET)
-                    {
-                        BOOST_ASSERT(field->type.element.hasvalue());
-
-                        bool matched;
-
-                        if ((field->type.id == BT_LIST && field->type.element->id == BT_INT8)                       // blob
-                            || (field->type.element->id == BT_LIST && field->type.element->element->id == BT_INT8)) // nested blobs
-                        {
-                            matched = (type == WireType::LengthDelimited);
-                        }
-                        else
-                        {
-                            if (field->type.element->id == BT_LIST || field->type.element->id == BT_SET || field->type.element->id == BT_MAP)
-                            {
-                                detail::proto::NotSupportedException("Container nesting");
-                            }
-
-                            Packing packing = _strict_match
-                                ? detail::proto::ReadPacking(field->type.element->id, &field->metadata)
-                                : detail::proto::Unavailable<Packing>::value;
-
-                            Encoding encoding = detail::proto::ReadEncoding(field->type.element->id, &field->metadata);
-
-                            matched = detail::proto::MatchWireType(field->type.element->id, type, encoding, packing, _strict_match);
-
-                            if (matched)
-                            {
-                                _input.SetEncoding(encoding);
-                            }
-                        }
-
-                        if (matched)
-                        {
-                            transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
-                            continue;
-                        }
-                    }
-                    else if (field->type.id == BT_MAP)
-                    {
-                        if (field->type.element->id == BT_SET
-                            || field->type.element->id == BT_MAP
-                            || (field->type.element->id == BT_LIST && field->type.element->element->id != BT_INT8)) // nested blob
-                        {
-                            detail::proto::NotSupportedException("Container nesting");
-                        }
-
-                        if (detail::proto::MatchWireType<BT_MAP>(type))
-                        {
-                            BOOST_ASSERT(field->type.key.hasvalue());
-                            _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field->type.key->id, &field->metadata));
-
-                            BOOST_ASSERT(field->type.element.hasvalue());
-                            _input.SetEncoding(detail::proto::ReadValueEncoding(field->type.element->id, &field->metadata));
-
-                            transform.Field(id, field->metadata, value<void, Input>{ _input, RuntimeSchema{ schema, *field } });
+                            detail::Field(*fieldDef, schema, transform, _input);
                             continue;
                         }
                     }
                     else
                     {
-                        Encoding encoding = detail::proto::ReadEncoding(field->type.id, &field->metadata);
+                        Encoding encoding = detail::proto::ReadEncoding(field.id, &fieldDef->metadata);
 
                         if (detail::BasicTypeField(
                                 id,
-                                field->metadata,
-                                field->type.id,
+                                fieldDef->metadata,
+                                field.id,
                                 BindWireTypeField(type, encoding, _strict_match, transform),
                                 _input))
                         {
@@ -560,6 +503,71 @@ namespace bond
                 }
 
                 transform.UnknownField(id, value<void, Input>{ _input, BT_UNAVAILABLE });
+            }
+        }
+
+
+        bool MatchWireType(const FieldDef& fieldDef, WireType type)
+        {
+            const auto& field = fieldDef.type;
+
+            switch (field.id)
+            {
+            case BT_STRUCT:
+                return detail::proto::MatchWireType<BT_STRUCT>(type);
+
+            case BT_LIST:
+            case BT_SET:
+                BOOST_ASSERT(field.element.hasvalue());
+
+                if ((field.id == BT_LIST && field.element->id == BT_INT8)                       // blob
+                    || (field.element->id == BT_LIST && field.element->element->id == BT_INT8)) // nested blobs
+                {
+                    return type == WireType::LengthDelimited;
+                }
+                else
+                {
+                    if (field.element->id == BT_LIST || field.element->id == BT_SET || field.element->id == BT_MAP)
+                    {
+                        detail::proto::NotSupportedException("Container nesting");
+                    }
+
+                    Packing packing = _strict_match
+                        ? detail::proto::ReadPacking(field.element->id, &fieldDef.metadata)
+                        : detail::proto::Unavailable<Packing>::value;
+
+                    Encoding encoding = detail::proto::ReadEncoding(field.element->id, &fieldDef.metadata);
+
+                    if (detail::proto::MatchWireType(field.element->id, type, encoding, packing, _strict_match))
+                    {
+                        _input.SetEncoding(encoding);
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case BT_MAP:
+                if (field.element->id == BT_SET
+                    || field.element->id == BT_MAP
+                    || (field.element->id == BT_LIST && field.element->element->id != BT_INT8)) // nested blob
+                {
+                    detail::proto::NotSupportedException("Container nesting");
+                }
+
+                if (detail::proto::MatchWireType<BT_MAP>(type))
+                {
+                    BOOST_ASSERT(field.key.hasvalue());
+                    _input.SetKeyEncoding(detail::proto::ReadKeyEncoding(field.key->id, &fieldDef.metadata));
+                    BOOST_ASSERT(field.element.hasvalue());
+                    _input.SetEncoding(detail::proto::ReadValueEncoding(field.element->id, &fieldDef.metadata));
+                    return true;
+                }
+                return false;
+
+            default:
+                BOOST_ASSERT(false);
+                return false;
             }
         }
 
