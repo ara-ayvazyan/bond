@@ -30,20 +30,12 @@ void CheckBinaryFormat(std::initializer_list<Bond> bond_structs, bool strict = t
 
     auto payload = proto_struct.SerializeAsString();
 
-    // merged payload
+    for (const auto& input : {
+            // merged payload
+            bond::InputBuffer{ merged_payload.data(), static_cast<uint32_t>(merged_payload.length()) },
+            // merged object
+            bond::InputBuffer{ payload.data(), static_cast<uint32_t>(payload.length()) } })
     {
-        bond::InputBuffer input{ merged_payload.data(), static_cast<uint32_t>(merged_payload.length()) };
-        bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
-
-        // Compile-time schema
-        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader)));
-        // Runtime schema
-        BOOST_CHECK((bond_struct == bond::Deserialize<Bond>(reader, bond::GetRuntimeSchema<Bond>())));
-    }
-    // merged object
-    {
-        
-        bond::InputBuffer input{ payload.data(), static_cast<uint32_t>(payload.length()) };
         bond::ProtobufBinaryReader<bond::InputBuffer> reader{ input, strict };
 
         // Compile-time schema
