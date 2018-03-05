@@ -20,12 +20,24 @@ namespace detail
 {
 namespace proto
 {
+    struct RequiredFieldInfo
+    {
+        explicit RequiredFieldInfo(uint16_t id)
+            : id{ id },
+              visited{ false }
+        {}
+
+        uint16_t id;
+        bool visited;
+    };
+
+
     template <typename T>
     class RequiredFieldIds
     {
     public:
         using type = std::array<
-            std::pair<uint16_t, bool>,
+            RequiredFieldInfo,
             boost::mpl::count_if<typename schema<T>::type::fields, is_required_field<_> >::value>;
 
         static const type& instance;
@@ -45,7 +57,7 @@ namespace proto
             typename boost::enable_if<is_required_field<Field> >::type
             operator()(const Field&)
             {
-                *it++ = std::make_pair(Field::id, false);
+                *it++ = RequiredFieldInfo{ Field::id };
             }
 
             template <typename Field>
@@ -67,6 +79,25 @@ namespace proto
 
     template <typename T>
     const typename RequiredFieldIds<T>::type& RequiredFieldIds<T>::instance = Init();
+
+
+    template <typename Iterator>
+    inline Iterator FindNextField(Iterator begin, Iterator end, Iterator hint, uint16_t id)
+    {
+        if (hint == end || (hint->id != id && (++hint == end || hint->id != id)))
+        {
+            hint = std::lower_bound(
+                begin,
+                end,
+                id,
+                [](typename std::iterator_traits<Iterator>::reference item, uint16_t id)
+                {
+                    return item.id < id;
+                });
+        }
+
+        return hint != end && hint->id == id ? hint : end;
+    }
 
 
     template <typename T>
@@ -91,7 +122,10 @@ namespace proto
             BOOST_STATIC_ASSERT(std::is_same<typename Head::field_modifier,
                                             reflection::required_field_modifier>::value);
 
-            NextField(Head::id);
+            _it = FindNextField(_ids.begin(), _ids.end(), _it, Head::id);
+
+            BOOST_ASSERT(_it != _ids.end());
+            BOOST_ASSERT(_it->id == Head::id);
 
             if (!_it->second)
             {
@@ -117,26 +151,13 @@ namespace proto
         }
 
     private:
-        void NextField(uint16_t id)
-        {
-            if (_it == _ids.end()
-                || (_it->first != id && (++_it == _ids.end() || _it->first != id)))
-            {
-                _it = std::lower_bound(_ids.begin(), _ids.end(), id,
-                    [](const std::pair<uint16_t, bool>& pair, uint16_t id) { return pair.first < id; });
-            }
-
-            BOOST_ASSERT(_it != _ids.end());
-            BOOST_ASSERT(_it->first == id);
-        }
-
         typename RequiredFieldIds<T>::type::iterator _it;
         uint16_t _count;
         typename RequiredFieldIds<T>::type _ids;
     };
 
 
-    template <typename U>
+    template <typename T>
     using always_one = std::integral_constant<uint16_t, 1>;
 
     template <typename T>

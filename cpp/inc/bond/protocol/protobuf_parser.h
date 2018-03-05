@@ -9,6 +9,8 @@
 #include <bond/core/bond_types.h>
 #include <bond/core/value.h>
 
+#include "protobuf_field_validator.h"
+
 
 namespace bond
 {
@@ -249,48 +251,6 @@ namespace bond
         }
 
     private:
-        template <typename Transform>
-        class WireTypeFieldBinder
-        {
-        public:
-            WireTypeFieldBinder(WireType type, Encoding encoding, bool strict_match, const Transform& transform)
-                : _type{ type },
-                  _encoding{ encoding },
-                  _strict_match{ strict_match },
-                  _transform{ transform }
-            {}
-
-            template <typename T>
-            bool Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
-            {
-                BOOST_STATIC_ASSERT(is_basic_type<T>::value);
-
-                if (detail::proto::MatchWireType<get_type_id<T>::value>(_type, _encoding, _strict_match))
-                {
-                    value.GetInput().SetEncoding(_encoding);
-
-                    _transform.Field(id, metadata, value);
-                    return true;
-                }
-
-                return false;
-            }
-
-        private:
-            const WireType _type;
-            const Encoding _encoding;
-            const bool _strict_match;
-            const Transform& _transform;
-        };
-
-        template <typename Transform>
-        WireTypeFieldBinder<Transform> BindWireTypeField(
-            WireType type, Encoding encoding, bool strict_match, const Transform& transform)
-        {
-            return WireTypeFieldBinder<Transform>{ type, encoding, strict_match, transform };
-        }
-
-
         // use compile-time schema
         template <typename Schema, typename Transform>
         void Read(const Schema&, const Transform& transform)
@@ -467,14 +427,9 @@ namespace bond
 
             for (auto it = fields.begin(); _input.ReadFieldBegin(type, id); _input.ReadFieldEnd())
             {
-                if (it == fields.end()
-                    || (it->id != id && (++it == fields.end() || it->id != id)))
-                {
-                    it = std::lower_bound(fields.begin(), fields.end(), id,
-                        [](const FieldDef& f, uint16_t id) { return f.id < id; });
-                }
+                it = detail::proto::FindNextField(fields.begin(), fields.end(), it, id);
 
-                if (const FieldDef* fieldDef = (it != fields.end() && it->id == id ? &*it : nullptr))
+                if (const FieldDef* fieldDef = (it != fields.end() ? &*it : nullptr))
                 {
                     const auto& field = fieldDef->type;
 
@@ -569,6 +524,48 @@ namespace bond
                 BOOST_ASSERT(false);
                 return false;
             }
+        }
+
+
+        template <typename Transform>
+        class WireTypeFieldBinder
+        {
+        public:
+            WireTypeFieldBinder(WireType type, Encoding encoding, bool strict_match, const Transform& transform)
+                : _type{ type },
+                  _encoding{ encoding },
+                  _strict_match{ strict_match },
+                  _transform{ transform }
+            {}
+
+            template <typename T>
+            bool Field(uint16_t id, const Metadata& metadata, const value<T, Input&>& value) const
+            {
+                BOOST_STATIC_ASSERT(is_basic_type<T>::value);
+
+                if (detail::proto::MatchWireType<get_type_id<T>::value>(_type, _encoding, _strict_match))
+                {
+                    value.GetInput().SetEncoding(_encoding);
+
+                    _transform.Field(id, metadata, value);
+                    return true;
+                }
+
+                return false;
+            }
+
+        private:
+            const WireType _type;
+            const Encoding _encoding;
+            const bool _strict_match;
+            const Transform& _transform;
+        };
+
+        template <typename Transform>
+        WireTypeFieldBinder<Transform> BindWireTypeField(
+            WireType type, Encoding encoding, bool strict_match, const Transform& transform)
+        {
+            return WireTypeFieldBinder<Transform>{ type, encoding, strict_match, transform };
         }
 
 
