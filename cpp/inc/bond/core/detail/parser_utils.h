@@ -61,7 +61,7 @@ namespace detail
     typename boost::enable_if_c<(is_reader<X>::value
                                 ? is_fast_path_field<T, Transform>::value
                                 : is_fast_object_path_field<Transform>::value), bool>::type
-    inline Field(const T& field, const Transform& transform, X&& value)
+    inline NonBasicTypeField(const T& field, const Transform& transform, X&& value)
     {
         return transform.Field(field, GetFieldValue<T>(std::forward<X>(value)));
     }
@@ -71,14 +71,14 @@ namespace detail
     typename boost::disable_if_c<(is_reader<X>::value
                                 ? is_fast_path_field<T, Transform>::value
                                 : is_fast_object_path_field<Transform>::value), bool>::type
-    inline Field(const T&, const Transform& transform, X&& value)
+    inline NonBasicTypeField(const T&, const Transform& transform, X&& value)
     {
         return transform.Field(T::id, T::metadata, GetFieldValue<T>(std::forward<X>(value)));
     }
 
 
     template <typename Reader, typename Transform>
-    inline bool Field(const FieldDef& field, const RuntimeSchema& schema, const Transform& transform, Reader& input)
+    inline bool NonBasicTypeField(const FieldDef& field, const RuntimeSchema& schema, const Transform& transform, Reader& input)
     {
         if (field.type.id == BT_STRUCT)
         {

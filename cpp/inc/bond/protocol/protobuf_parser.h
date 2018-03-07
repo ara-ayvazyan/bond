@@ -286,7 +286,7 @@ namespace bond
                 {
                     if (MatchWireType<Head>(type))
                     {
-                        detail::Field(Head{}, transform, _input);
+                        detail::NonBasicTypeField(Head{}, transform, _input);
                     }
                     else
                     {
@@ -437,7 +437,7 @@ namespace bond
                     {
                         if (MatchWireType(*fieldDef, type))
                         {
-                            detail::Field(*fieldDef, schema, transform, _input);
+                            detail::NonBasicTypeField(*fieldDef, schema, transform, _input);
                             continue;
                         }
                     }
