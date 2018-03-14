@@ -1,8 +1,15 @@
 syntax = "proto3";
 package example;
 
+message Other
+{
+    bytes bytes = 1;
+    float f = 2;
+}
+
 message Example
 {
     int32 i = 1;
     string str = 2;
+    Other msg = 3;
 }
