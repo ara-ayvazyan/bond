@@ -49,6 +49,7 @@ if (BOND_ENABLE_JAVA)
     add_subdirectory (java)
 endif()
 
+add_subdirectory (tools/protoc-plugin)
 
 install (DIRECTORY
     cpp/inc/bond
