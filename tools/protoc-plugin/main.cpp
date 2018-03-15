@@ -63,6 +63,11 @@ namespace proto
 
         void Generate(const google::protobuf::FieldDescriptor& field)
         {
+            if (field.number() > (std::numeric_limits<std::uint16_t>::max)())
+            {
+                throw std::exception{ "Field ids larger than 65535 are not supported." };
+            }
+
             if (auto packing = GetPacking(field))
             {
                 _printer.Print("[ProtoPack(\"$packing$\")]\n",
@@ -231,6 +236,21 @@ namespace proto
 
         void Generate(const google::protobuf::Descriptor& msg)
         {
+            if (msg.oneof_decl_count() != 0)
+            {
+                throw std::exception{ "Oneof is not supported." };
+            }
+
+            for (int i = 0; i < msg.nested_type_count(); ++i)
+            {
+                auto type = msg.nested_type(i);
+
+                if (type->name() != "MEntry")
+                {
+                    throw std::exception{ "Nested types are not supported." };
+                }
+            }
+
             _printer.Print("\nstruct $name$\n{\n",
                 "name", msg.name());
             _printer.Indent();
@@ -261,9 +281,14 @@ namespace proto
     public:
         void Generate(const google::protobuf::FileDescriptor& file, google::protobuf::compiler::GeneratorContext& context)
         {
-            auto basename = google::protobuf::StripSuffixString(file.name(), ".proto");
+            if (file.service_count() != 0)
+            {
+                throw std::exception{ "Services are not supported." };
+            }
 
-            std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output{ context.Open(basename + ".bond") };
+            std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output{
+                context.Open(google::protobuf::StripSuffixString(file.name(), ".proto") + ".bond") };
+
             google::protobuf::io::Printer printer{ output.get(), '$' };
 
             {
