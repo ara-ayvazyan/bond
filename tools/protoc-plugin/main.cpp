@@ -126,6 +126,12 @@ namespace proto
             return field.is_repeated() ? ("vector<" + name + ">") : name;
         }
 
+        template <typename Desc>
+        static const google::protobuf::string& TypeName(const google::protobuf::FieldDescriptor& field, const Desc& desc)
+        {
+            return field.file()->package() == desc.file()->package() ? desc.name() : desc.full_name();
+        }
+
         static google::protobuf::string GetBasicTypeName(const google::protobuf::FieldDescriptor& field)
         {
             switch (field.cpp_type())
@@ -152,15 +158,16 @@ namespace proto
                 return "bool";
 
             case google::protobuf::FieldDescriptor::CPPTYPE_ENUM:
-                return field.enum_type()->name();
+                return TypeName(field, *field.enum_type());
 
             case google::protobuf::FieldDescriptor::CPPTYPE_STRING:
                 return field.type() == google::protobuf::FieldDescriptor::TYPE_BYTES ? "blob" : "string";
 
             case google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
-                return field.options().lazy()
-                    ? ("bonded<" + field.message_type()->name() + ">")
-                    : field.message_type()->name();
+                {
+                    const auto& name = TypeName(field, *field.message_type());
+                    return field.options().lazy() ? ("bonded<" + name + ">") : name;
+                }
             }
 
             assert(false);
@@ -258,6 +265,16 @@ namespace proto
 
             std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output{ context.Open(basename + ".bond") };
             google::protobuf::io::Printer printer{ output.get(), '$' };
+
+            {
+                for (int i = 0; i < file.dependency_count(); ++i)
+                {
+                    auto dep = file.dependency(i);
+
+                    printer.Print("import \"$name$\"\n",
+                        "name", google::protobuf::StripSuffixString(dep->name(), ".proto") + ".bond");
+                }
+            }
 
             printer.Print("namespace $namespace$\n",
                 "namespace", file.package());

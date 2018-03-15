@@ -1,30 +1,17 @@
 syntax = "proto2";
 package example;
 
-enum MyEnum
-{
-    Value1 = 0;
-    Value2 = 100;
-    Value3 = 300;
-}
-
-message Other
-{
-    required bytes bytes = 1;
-    optional float f = 2;
-    optional string s = 10 [default="Hello"];
-    optional MyEnum e1 = 20;
-    optional MyEnum e2 = 21 [default=Value2];
-}
+import "other.proto";
 
 message Example
 {
     optional int32 i = 1 [default=123];
     optional string str = 2;
-    optional Other msg = 3;
-    optional Other lazy_msg = 4 [lazy=true];
+    optional other.Other msg = 3;
+    optional other.Other lazy_msg = 4 [lazy=true];
     optional fixed64 x = 5;
     map<int32, float> m = 6;
     repeated uint64 integers = 7;
     repeated string strs = 8;
+    optional other.MyEnum e = 9 [default=Value3];
 }

@@ -1,0 +1,18 @@
+syntax = "proto2";
+package other;
+
+enum MyEnum
+{
+    Value1 = 0;
+    Value2 = 100;
+    Value3 = 300;
+}
+
+message Other
+{
+    required bytes bytes = 1;
+    optional float f = 2;
+    optional string s = 10 [default="Hello"];
+    optional MyEnum e1 = 20;
+    optional MyEnum e2 = 21 [default=Value2];
+}
