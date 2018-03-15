@@ -12,4 +12,5 @@ message Example
     int32 i = 1;
     string str = 2;
     Other msg = 3;
+    Other lazy_msg = 4 [lazy=true];
 }
