@@ -1,16 +1,21 @@
-syntax = "proto3";
+syntax = "proto2";
 package example;
 
 message Other
 {
-    bytes bytes = 1;
-    float f = 2;
+    required bytes bytes = 1;
+    optional float f = 2;
+    optional string s = 10 [default="Hello"];
 }
 
 message Example
 {
-    int32 i = 1;
-    string str = 2;
-    Other msg = 3;
-    Other lazy_msg = 4 [lazy=true];
+    optional int32 i = 1 [default=123];
+    optional string str = 2;
+    optional Other msg = 3;
+    optional Other lazy_msg = 4 [lazy=true];
+    optional fixed64 x = 5;
+    map<int32, float> m = 6;
+    repeated uint64 integers = 7;
+    repeated string strs = 8;
 }

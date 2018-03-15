@@ -27,32 +27,35 @@ namespace proto
 
         void Generate(const google::protobuf::FieldDescriptor& field)
         {
-            if (auto packing = GetFieldPacking(field))
+            if (auto packing = GetPacking(field))
             {
                 _printer.Print("[ProtoPack(\"$packing$\")]\n",
                     "packing", packing);
             }
 
-            if (auto encoding = GetFieldEncoding(field))
+            if (auto encoding = GetEncoding(field))
             {
                 _printer.Print("[ProtoEncode(\"$encoding$\")]\n",
                     "encoding", encoding);
             }
 
-            _printer.Print("$required$$id$: $type$ $name$;\n",
-                "required", field.label() == google::protobuf::FieldDescriptor::LABEL_REQUIRED ? "required" : "",
+            auto default_value = GetDefaultValue(field);
+
+            _printer.Print("$id$:$required$ $type$ $name$$default$;\n",
+                "required", field.label() == google::protobuf::FieldDescriptor::LABEL_REQUIRED ? " required" : "",
                 "id", std::to_string(field.number()),
-                "type", GetFieldTypeName(field),
-                "name", field.name());
+                "type", GetTypeName(field),
+                "name", field.name(),
+                "default", default_value.empty() ? "" : (" = " + default_value));
         }
 
     private:
-        static const char* GetFieldPacking(const google::protobuf::FieldDescriptor& field)
+        static const char* GetPacking(const google::protobuf::FieldDescriptor& field)
         {
             return field.is_packable() && !field.is_packed() ? "False" : nullptr;
         }
 
-        static const char* GetFieldEncoding(const google::protobuf::FieldDescriptor& field)
+        static const char* GetEncoding(const google::protobuf::FieldDescriptor& field)
         {
             switch (field.type())
             {
@@ -70,7 +73,24 @@ namespace proto
             return nullptr;
         }
 
-        static google::protobuf::string GetFieldTypeName(const google::protobuf::FieldDescriptor& field)
+        static google::protobuf::string GetTypeName(const google::protobuf::FieldDescriptor& field)
+        {
+            if (field.is_map())
+            {
+                auto entry = field.message_type();
+                return "map<"
+                    + GetBasicTypeName(*entry->FindFieldByName("key"))
+                    + ", "
+                    + GetBasicTypeName(*entry->FindFieldByName("value"))
+                    + ">";
+            }
+
+            auto name = GetBasicTypeName(field);
+
+            return field.is_repeated() ? ("vector<" + name + ">") : name;
+        }
+
+        static google::protobuf::string GetBasicTypeName(const google::protobuf::FieldDescriptor& field)
         {
             switch (field.cpp_type())
             {
@@ -111,6 +131,50 @@ namespace proto
             return nullptr;
         }
 
+        static google::protobuf::string GetDefaultValue(const google::protobuf::FieldDescriptor& field)
+        {
+            if (!field.has_default_value())
+            {
+                return "";
+            }
+
+            switch (field.cpp_type())
+            {
+            case google::protobuf::FieldDescriptor::CPPTYPE_INT32:
+                return std::to_string(field.default_value_int32());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_INT64:
+                return std::to_string(field.default_value_int64());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_UINT32:
+                return std::to_string(field.default_value_uint32());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_UINT64:
+                return std::to_string(field.default_value_uint64());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
+                return std::to_string(field.default_value_double());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_FLOAT:
+                return std::to_string(field.default_value_float());
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_BOOL:
+                return field.default_value_bool() ? "true" : "false";
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_ENUM:
+                return field.enum_type()->value(field.default_value_enum()->index())->name();
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_STRING:
+                return "\"" + field.default_value_string() + "\""; // TODO: Replace " with \"
+
+            case google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
+                return "";
+            }
+
+            assert(false);
+            return "";
+        }
+
         google::protobuf::io::Printer& _printer;
     };
 
@@ -132,6 +196,11 @@ namespace proto
 
             for (int i = 0; i < msg.field_count(); ++i)
             {
+                if (i != 0)
+                {
+                    _printer.Print("\n");
+                }
+
                 field_generator.Generate(*msg.field(i));
             }
 
