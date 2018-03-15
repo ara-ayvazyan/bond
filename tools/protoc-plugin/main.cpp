@@ -245,7 +245,7 @@ namespace proto
             {
                 auto type = msg.nested_type(i);
 
-                if (type->name() != "MEntry")
+                if (!type->options().map_entry())
                 {
                     throw std::exception{ "Nested types are not supported." };
                 }
