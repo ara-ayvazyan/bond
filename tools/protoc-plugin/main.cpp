@@ -18,6 +18,42 @@ namespace detail
 {
 namespace proto
 {
+    class EnumGenerator
+    {
+    public:
+        explicit EnumGenerator(google::protobuf::io::Printer& printer)
+            : _printer{ printer }
+        {}
+
+        void Generate(const google::protobuf::EnumDescriptor& en)
+        {
+            _printer.Print("\nenum $name$\n{\n",
+                "name", en.name());
+            _printer.Indent();
+
+            for (int i = 0; i < en.value_count(); ++i)
+            {
+                if (i != 0)
+                {
+                    _printer.Print(",\n");
+                }
+
+                auto value = en.value(i);
+
+                _printer.Print("$name$ = $value$",
+                    "name", value->name(),
+                    "value", std::to_string(value->number()));
+            }
+
+            _printer.Outdent();
+            _printer.Print("\n}\n");
+        }
+
+    private:
+        google::protobuf::io::Printer& _printer;
+    };
+
+
     class FieldGenerator
     {
     public:
@@ -226,11 +262,21 @@ namespace proto
             printer.Print("namespace $namespace$\n",
                 "namespace", file.package());
 
-            StructGenerator struct_generator{ printer };
-
-            for (int i = 0; i < file.message_type_count(); ++i)
             {
-                struct_generator.Generate(*file.message_type(i));
+                EnumGenerator enum_generator{ printer };
+
+                for (int i = 0; i < file.enum_type_count(); ++i)
+                {
+                    enum_generator.Generate(*file.enum_type(i));
+                }
+            }
+            {
+                StructGenerator struct_generator{ printer };
+
+                for (int i = 0; i < file.message_type_count(); ++i)
+                {
+                    struct_generator.Generate(*file.message_type(i));
+                }
             }
         }
     };
