@@ -1,7 +1,7 @@
 syntax = "proto2";
 package example;
 
-import "other.proto";
+import "folder/other.proto";
 
 message Example
 {
