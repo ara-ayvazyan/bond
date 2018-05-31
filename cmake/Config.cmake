@@ -130,7 +130,8 @@ find_package (Boost 1.58.0
         thread
         system
         unit_test_framework
-        python)
+        python
+        program_options)
 
 message(STATUS "Boost Python Library: ${Boost_PYTHON_LIBRARY}")
 

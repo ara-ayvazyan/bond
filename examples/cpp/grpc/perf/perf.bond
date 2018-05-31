@@ -1,0 +1,11 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+import "bond/core/bond.bond"
+
+namespace perf;
+
+service PerfService
+{
+    bond.Box<blob> Ping(bond.Box<blob>);
+}
