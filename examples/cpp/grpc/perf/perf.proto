@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package perf.grpc;
+
+import "google/protobuf/wrappers.proto";
+
+service PerfService
+{
+    rpc Ping (google.protobuf.BytesValue) returns (google.protobuf.BytesValue) {}
+}
