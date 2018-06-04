@@ -7,10 +7,14 @@
 
 #include <boost/make_shared.hpp>
 #include <boost/optional.hpp>
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4505)
+#endif
 #include <boost/program_options.hpp>
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -340,7 +344,7 @@ namespace perf
                 std::atomic_bool _stop{ false };
                 counter _count;
                 const bond::blob _request;
-                std::atomic_uint64_t _failed{ 0 };
+                std::atomic<std::uint64_t> _failed{ 0 }; // std::atomic_uint64_t is missing in libstdc++ < 7.1
                 std::mutex _latenciesLock;
                 std::vector<std::chrono::microseconds> _latencies;
                 const std::chrono::high_resolution_clock::time_point _begin;
