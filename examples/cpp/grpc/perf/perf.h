@@ -32,11 +32,79 @@
 
 namespace perf
 {
+    class options
+    {
+    public:
+        options(int argc, char* argv[])
+        {
+            namespace po = boost::program_options;
+
+            po::options_description desc{ "perf.exe program options" };
+            desc.add_options()
+                ("help,h", "Print usage message")
+                ("transport,t", po::value<std::string>(&_transport)->required(), "Transport name")
+                ("server,s", po::bool_switch(&_server)->default_value(false), "Host server")
+                ("clients,c", po::value<std::uint16_t>(&_clients)->default_value(0), "Number of clients to use")
+                ("ip", po::value<std::string>(&_ip)->default_value("127.0.0.1"), "IP Address")
+                ("port", po::value<std::uint16_t>(&_port)->default_value(7000), "Port number")
+                ("flights,f", po::value<std::uint32_t>(&_flights)->default_value(1000), "Number of active requests")
+                ("payload,p", po::value<std::uint32_t>(&_payload)->default_value(1024), "Payload size in bytes")
+                ("duration,d", po::value<std::uint32_t>(&_duration)->default_value(0), "Test execution duration in seconds")
+                ("csv", po::bool_switch(&_csv)->default_value(false), "CSV format")
+                ("csv-header", po::bool_switch(&_csv_header)->default_value(false), "CSV format header");
+
+            po::variables_map vm;
+            po::store(po::parse_command_line(argc, argv, desc), vm);
+
+            if (vm.count("help"))
+            {
+                std::stringstream ss;
+                ss << desc;
+                throw std::logic_error{ ss.str() };
+            }
+
+            po::notify(vm);
+        }
+
+        const std::string& transport() const { return _transport; }
+
+        bool host_server() const { return _server; }
+
+        std::uint16_t clients() const { return _clients; }
+
+        const std::string& ip() const { return _ip; }
+
+        std::uint16_t port() const { return _port; }
+
+        std::uint32_t payload() const { return _payload; }
+
+        std::uint32_t flights() const { return _flights; }
+
+        std::uint32_t duration() const { return _duration; }
+
+        bool csv() const { return _csv; }
+
+        bool csv_header() const { return _csv_header; }
+
+    private:
+        std::string _transport;
+        bool _server;
+        std::uint16_t _clients;
+        std::string _ip;
+        std::uint16_t _port;
+        std::uint32_t _payload;
+        std::uint32_t _flights;
+        std::uint32_t _duration;
+        bool _csv;
+        bool _csv_header;
+    };
+
     struct stats
     {
         std::chrono::seconds time{ std::chrono::seconds::zero() };
         std::uint64_t failed{ 0 };
         std::vector<std::chrono::microseconds> latencies;
+        boost::optional<options> opts;
     };
 
     std::ostream& operator<<(std::ostream& os, const std::chrono::microseconds& d)
@@ -56,25 +124,82 @@ namespace perf
 
     std::ostream& operator<<(std::ostream& os, const stats& s)
     {
-        os  << "Requests: " << s.latencies.size() << " [Failed:" << s.failed << "]" << std::endl
-            << "Time: " << s.time.count() << "s" << std::endl;
-
-        if (s.time.count() != 0)
+        const auto& opts = s.opts;
+        if (opts && opts->csv())
         {
-            os  << "QPS: " << s.latencies.size() / s.time.count() << std::endl;
+            const auto sep = ',';
+
+            if (opts->csv_header())
+            {
+                os  << "Requests" << sep
+                    << "Failed" << sep
+                    << "Clients" << sep
+                    << "Payload" << sep
+                    << "Flights" << sep
+                    << "Duration" << sep
+                    << "Runtime" << sep
+                    << "QPS" << sep
+                    << "Min" << sep
+                    << "Avg" << sep
+                    << "50%" << sep
+                    << "90%" << sep
+                    << "95%" << sep
+                    << "99%" << sep
+                    << "Max" << std::endl;
+            }
+
+            os  << s.latencies.size() << sep
+                << s.failed << sep
+                << opts->clients() << sep
+                << opts->payload() << sep
+                << opts->flights() << sep
+                << opts->duration() << sep
+                << s.time.count() << sep
+                << (s.time.count() != 0 ? s.latencies.size() / s.time.count() : 0) << sep;
+
+            if (!s.latencies.empty())
+            {
+                os  << s.latencies.front().count() << sep
+                    << (std::accumulate(s.latencies.begin(), s.latencies.end(), std::chrono::microseconds::zero()) / s.latencies.size()).count() << sep
+                    << s.latencies[std::size_t(0.50 * s.latencies.size())].count() << sep
+                    << s.latencies[std::size_t(0.90 * s.latencies.size())].count() << sep
+                    << s.latencies[std::size_t(0.95 * s.latencies.size())].count() << sep
+                    << s.latencies[std::size_t(0.99 * s.latencies.size())].count() << sep
+                    << s.latencies.back().count();
+            }
+            else
+            {
+                os  << 0 << sep
+                    << 0 << sep
+                    << 0 << sep
+                    << 0 << sep
+                    << 0 << sep
+                    << 0 << sep
+                    << 0;
+            }
         }
-
-        if (!s.latencies.empty())
+        else
         {
-            os  << "Latencies:"
-                << std::setprecision(2) << std::fixed
-                << "  Min:" << s.latencies.front()
-                << ", Avg:" << std::accumulate(s.latencies.begin(), s.latencies.end(), std::chrono::microseconds::zero()) / s.latencies.size()
-                << ", 50%:" << s.latencies[std::size_t(0.50 * s.latencies.size())]
-                << ", 90%:" << s.latencies[std::size_t(0.90 * s.latencies.size())]
-                << ", 95%:" << s.latencies[std::size_t(0.95 * s.latencies.size())]
-                << ", 99%:" << s.latencies[std::size_t(0.99 * s.latencies.size())]
-                << ", Max:" << s.latencies.back();
+            os  << "Requests: " << s.latencies.size() << " [Failed:" << s.failed << "]" << std::endl
+                << "Time: " << s.time.count() << "s" << std::endl;
+
+            if (s.time.count() != 0)
+            {
+                os  << "QPS: " << s.latencies.size() / s.time.count() << std::endl;
+            }
+
+            if (!s.latencies.empty())
+            {
+                os  << "Latencies:"
+                    << std::setprecision(2) << std::fixed
+                    << "  Min:" << s.latencies.front()
+                    << ", Avg:" << std::accumulate(s.latencies.begin(), s.latencies.end(), std::chrono::microseconds::zero()) / s.latencies.size()
+                    << ", 50%:" << s.latencies[std::size_t(0.50 * s.latencies.size())]
+                    << ", 90%:" << s.latencies[std::size_t(0.90 * s.latencies.size())]
+                    << ", 95%:" << s.latencies[std::size_t(0.95 * s.latencies.size())]
+                    << ", 99%:" << s.latencies[std::size_t(0.99 * s.latencies.size())]
+                    << ", Max:" << s.latencies.back();
+            }
         }
 
         return os;
@@ -145,6 +270,11 @@ namespace perf
             if (done)
             {
                 result = done();
+
+                if (result)
+                {
+                    result->opts = _options;
+                }
             }
 
             server.reset();
@@ -154,65 +284,6 @@ namespace perf
         }
 
     private:
-        class options
-        {
-        public:
-            options(int argc, char* argv[])
-            {
-                namespace po = boost::program_options;
-
-                po::options_description desc{ "perf.exe program options" };
-                desc.add_options()
-                    ("help,h", "Print usage message")
-                    ("transport,t", po::value<std::string>(&_transport)->required(), "Transport name")
-                    ("server,s", po::bool_switch(&_server)->default_value(false), "Host server")
-                    ("clients,c", po::value<std::uint16_t>(&_clients)->default_value(0), "Number of clients to use")
-                    ("ip", po::value<std::string>(&_ip)->default_value("127.0.0.1"), "IP Address")
-                    ("port", po::value<std::uint16_t>(&_port)->default_value(7000), "Port number")
-                    ("flights,f", po::value<std::uint32_t>(&_flights)->default_value(1000), "Number of active requests")
-                    ("payload,p", po::value<std::uint32_t>(&_payload)->default_value(1024), "Payload size in bytes")
-                    ("duration,d", po::value<std::uint32_t>(&_duration)->default_value(0), "Test execution duration in seconds");
-
-                po::variables_map vm;
-                po::store(po::parse_command_line(argc, argv, desc), vm);
-
-                if (vm.count("help"))
-                {
-                    std::stringstream ss;
-                    ss << desc;
-                    throw std::logic_error{ ss.str() };
-                }
-
-                po::notify(vm);
-            }
-
-            const std::string& transport() const { return _transport; }
-
-            bool host_server() const { return _server; }
-
-            std::uint16_t clients() const { return _clients; }
-
-            const std::string& ip() const { return _ip; }
-
-            std::uint16_t port() const { return _port; }
-
-            std::uint32_t payload() const { return _payload; }
-
-            std::uint32_t flights() const { return _flights; }
-
-            std::uint32_t duration() const { return _duration; }
-
-        private:
-            std::string _transport;
-            bool _server;
-            std::uint16_t _clients;
-            std::string _ip;
-            std::uint16_t _port;
-            std::uint32_t _payload;
-            std::uint32_t _flights;
-            std::uint32_t _duration;
-        };
-
         using TransportFuncs = std::pair<HostServerFunc, MakeClientFunc>;
 
         TransportFuncs find_transport() const
